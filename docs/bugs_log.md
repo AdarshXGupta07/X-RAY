@@ -28,3 +28,11 @@ Template: **Date · Symptom · Cause · How it was found · Fix · How to catch 
 - **How it was found.** `wc -c` showed 0 bytes; an `iconv` scan showed every other file was still valid UTF-8.
 - **Fix.** Restored the file with `git checkout -- docs/PROGRESS.md`, then redid the edit with `encoding="utf-8"`.
 - **Next time.** Always pass `encoding="utf-8"` when reading or writing text in Python on Windows (or set `PYTHONUTF8=1`). Commit before bulk edits so `git checkout` can undo them.
+
+## 2026-11-15 — Windows blocked a scikit-learn file
+
+- **Symptom.** `pytest` failed to import `sklearn.linear_model` with `ImportError: DLL load failed while importing _libsvm_sparse: An Application Control policy has blocked this file.`
+- **Cause.** A Windows application-control feature (this message is typical of Smart App Control or a similar policy) checked a newly installed compiled file and blocked it on first load.
+- **How it was found.** Importing each scikit-learn submodule on its own a minute later: all loaded. Two further test runs passed.
+- **Fix.** None needed; it did not come back. Security settings were not changed.
+- **Next time.** If the error recurs, it is a Windows security decision, not a Python bug. Options are yours: check Windows Security → App & browser control, or replace the blocked piece (here, logistic regression) with NumPy/SciPy code.

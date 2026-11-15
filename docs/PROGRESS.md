@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-15 (P3 added).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-15 (P5 and P6 added).
 
 ## Status by phase
 
@@ -15,13 +15,13 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-15 (P3 added).
 | P2 Model + score cache | Not started | |
 | P3 Calibration + conformal | **Done** | `calibration.py`, `conformal.py`, 41 passing tests; validity simulation run (below) |
 | P4 Leave-one-site-out | Not started | |
-| P5 Shift detection | Specified, not written | 7 tests waiting |
-| P6 Recalibration | Specified, not written | 5 tests waiting |
+| P5 Shift detection | **Done on synthetic data** | `shift.py`, 14 passing tests; real-data run waits for P2 |
+| P6 Recalibration | **Done on synthetic data** | `recalibration.py`, 13 passing tests; synthetic comparison of all methods (below) |
 | P7 Degradations | Specified, not written | 27 tests waiting |
 | P8 Demo | Not started | Folders only |
 | P9 Paper | Not started | |
 
-Test suite today: **77 passed, 39 expected-fail, 0 errors.**
+Test suite today: **109 passed, 27 expected-fail, 0 errors.**
 **The only results so far are synthetic** (validity simulation, no real images). Nothing in this repo supports any claim about TB detection.
 
 ## Validity simulation (synthetic, no shift)
@@ -44,6 +44,40 @@ What it shows:
 2. The certified threshold keeps the violation rate **at or below 10%** at every size, as designed.
 3. The price of certifying is caution: with few positives it flags more images than needed (mean sensitivity 0.96 at 50 positives), which will cost specificity.
 4. The label floors are real: below 9 positives no threshold exists; below 22 nothing can be certified.
+
+## Synthetic site-shift experiment (all methods, no real images)
+
+`python -m tbshift.experiments.synthetic_shift --out-dir results`: 1,000 repeats, seed 0, about 50 seconds. Synthetic TB logits: non-TB N(0, 1), TB N(2, 1), 50% TB at the source; 100 source TB cases for calibration; unlabelled target batch of 200.
+
+**Violation rate** (share of repeats with true sensitivity below 90%; lower is better):
+
+| Target site | Source certified | Label-free | Detect + defer | 100 target labels, certified |
+|---|---|---|---|---|
+| No change | 0.066 | 0.139 | 0.062 | 0.068 |
+| All scores drop 0.5 (harmful) | **0.827** | 0.145 | 0.059 | 0.060 |
+| All scores rise 0.5 (harmless) | 0.000 | 0.132 | 0.000 | 0.046 |
+| TB rises to 80% of cases | 0.056 | **0.975** | 0.000 | 0.082 |
+| TB scores more variable (subtle) | **0.980** | **0.874** | **0.723** | 0.055 |
+
+**How often the label-free detector fires** (unlabelled batch size across the top):
+
+| Target site | 10 | 50 | 200 |
+|---|---|---|---|
+| No change (false alarms) | 0.052 | 0.040 | 0.044 |
+| Harmful shift | 0.166 | 0.470 | 0.919 |
+| Harmless shift | 0.136 | 0.462 | 0.916 |
+| TB rises to 80% | 0.258 | 0.814 | 0.999 |
+| TB scores more variable | 0.075 | 0.132 | 0.295 |
+
+What it shows:
+
+1. **Silent failure is real (RQ1).** A shift the source never saw breaks the certified promise in 83–98% of repeats.
+2. **The detector cannot tell harm from harmless change (RQ2).** It fires just as often on the harmless shift as the harmful one, fires almost always when only prevalence changed (no harm), and mostly misses the subtle harmful shift. Detect-and-defer is safe only by deferring 91–100% of cases.
+3. **Label-free repair works only when its assumption holds (RQ3).** It fixes a pure score shift (0.827 → 0.145) but breaks a site where only TB prevalence changed (0.056 → 0.975). Even with no shift it violates 14% of the time, above the 10% budget, because it has no guarantee.
+4. **Labels are the only method that fixed every scenario**, and it takes about 50 TB positives: with 50 labels (about 25 positives) the certified threshold still has to give up 16–17% of the time.
+
+Full table, including every label budget and specificity: `results/synthetic_methods.csv` (regenerate with the command above).
+**Caveat:** this is a toy world of normal distributions chosen to illustrate each failure mode. It shows the methods behave as their assumptions predict; it says nothing about how often each failure happens at real hospitals.
 
 ## How to run what exists
 
@@ -78,12 +112,17 @@ You will be asked about this code in the viva. For each item: read the function,
 | Marginal conformal threshold | `conformal.py: conformal_threshold`, `marginal_rank` | Exchangeability; ranks of n + 1 exchangeable values; order statistics | Derive k = floor(alpha(n + 1)) from the rank argument. Why 9 positives at 90%? |
 | Certified threshold | `conformal.py: certified_threshold`, `certified_rank` | Binomial distribution; PAC guarantees; Clopper–Pearson idea | Why is "fewer than k calibration scores below q" a Binomial(n, alpha) event? Why 22 positives at alpha = delta = 0.10? |
 | Validity simulation | `experiments/validity_simulation.py` | Monte Carlo simulation; why a synthetic control comes before real data | Explain the 34–46% marginal violation rate to a non-expert. |
+| KS statistic and test | `shift.py: ks_statistic`, `detect_score_shift` | Empirical CDFs; the KS statistic; p-values; significance level; false alarms vs power | Why must the largest CDF gap occur at an observed value? Why is the false-alarm rate about 5%? |
+| Domain classifier | `shift.py: domain_classifier_auc` | Logistic regression; standardisation; stratified k-fold; out-of-fold predictions | Why would scoring on the training images overstate the shift? |
+| Quantile matching | `recalibration.py: quantile_match`, `label_free_threshold` | CDFs and quantiles; mid-ranks; what "matching distributions" assumes | Why does matching fail when TB becomes more common, even though nothing is wrong with the scanner? |
+| Few-label threshold | `recalibration.py: few_label_threshold` | Conformal thresholds from target positives; binomial number of positives in a random sample | With 50 labels at 50% TB, why can the certified threshold still be trivial? |
+| Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
 
 Wider topics for this stage are in [STUDY_TRACK.md](STUDY_TRACK.md), weeks 1 and 4.
 
 ## Open decisions (yours)
 
-1. Which datasets to download (see the audit). Needed before any further data or model work.
+1. Which datasets to download (see the audit). Needed before any further data or model work: the real-data versions of P4–P6 depend on it.
 2. Study `conformal.py` line by line before anything else. It was written for you, and it is the part an examiner will probe hardest.
 3. Read reading-log entry C1. It decides how the paper is framed.

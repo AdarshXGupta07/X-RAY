@@ -54,3 +54,28 @@ Template: **Date · Question · What was done · Result · Conclusion · Next.**
 **Caveat.** Synthetic, continuous scores. Real scores have ties and only 58 TB cases at Montgomery, so results there will be noisier.
 
 **Next.** Shift detection (P5) and recalibration (P6) can be written and tested on synthetic scores now; real experiments wait for data.
+
+---
+
+## 2026-11-15 — P5 and P6: shift detection, recalibration, synthetic comparison
+
+**Question.** Before any real data: do the label-free detector, label-free repair and few-label repair behave as their assumptions predict, and where does each one break?
+
+**What was done.**
+
+- `shift.py`: KS statistic written by hand (matches SciPy, including ties); KS test using SciPy's p-value; domain-classifier AUC from out-of-fold logistic-regression predictions.
+- `recalibration.py`: quantile matching by mid-rank position; the equivalent one-shot threshold move (`label_free_threshold`); few-label marginal and certified thresholds from target positives only.
+- `experiments/synthetic_shift.py`: five target scenarios × six method families, 1,000 repeats, seed 0. Exact sensitivity and specificity from the normal distributions.
+
+**Result.** See the tables in PROGRESS.md. In short:
+
+- Unseen score shift: source certified violates 0.827 (score drop) and 0.980 (TB spread).
+- KS detector at batch 200 fires 0.919 on the harmful shift and 0.916 on the harmless one; 0.999 when only prevalence changed; 0.295 on the subtle TB-spread shift. False-alarm rate 0.040–0.055.
+- Label-free repair: 0.827 → 0.145 on the score drop; 0.056 → 0.975 when TB rose to 80%; 0.139 with no shift.
+- Few-label certified at 100 labels (about 50 positives): 0.046–0.082 in every scenario.
+
+**Conclusion.** The most interesting synthetic finding for RQ2 is that a distribution detector measures "different", not "harmful". Whether that holds at real hospitals is now a concrete, testable question. For RQ3, label-free repair needs a prevalence check; the candidate datasets differ a lot in TB share (Mendeley about 83% TB, Shenzhen about 51%, Montgomery about 42%), so the prevalence failure is likely to matter in practice.
+
+**Caveat.** A toy world chosen to show each failure mode. It shows the code does what the theory says; it does not estimate how often anything happens at a real site.
+
+**Next.** Datasets (Gate B) → P1 data loaders → P2 score cache, then rerun P4–P6 on real cached scores. The domain-classifier detector is only tested on random embeddings so far.
