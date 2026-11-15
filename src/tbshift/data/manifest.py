@@ -48,12 +48,35 @@ def parse_filename(name: str) -> tuple[str, int, int] | None:
     return m["prefix"].upper(), int(m["number"]), int(m["label"])
 
 
-def parse_clinical_reading(text: str) -> dict:
-    """Pull sex, age (years) and the free-text finding out of a readings file.
+# Montgomery: "Patient's Sex: M" / "Patient's Age: 035Y" (DICOM style: Y, M, W, D).
+_SEX_FIELD = re.compile(r"sex\s*:\s*(?P<v>[a-z])", re.IGNORECASE)
+_AGE_FIELD = re.compile(r"age\s*:\s*(?P<num>\d{1,3})\s*(?P<unit>[a-z]*)", re.IGNORECASE)
+# Shenzhen: "male 35yrs", "female24yrs", "femal 32yrs" (sic), "Female, 28yrs", "Male , 50yrs",
+# "male 16month", "female 64days".
+_SEX_AGE_LINE = re.compile(
+    r"^(?P<sex>f(?:emale?)?|m(?:ale)?)[\s,]*(?P<num>\d{1,3})\s*(?P<unit>[a-z]*)", re.IGNORECASE
+)
 
-    Formats differ slightly between sets (for example 'Patient's Age: 035Y'
-    or 'male 35yrs'), so this is deliberately forgiving and returns None for
-    anything it cannot find.
+
+def _age_in_years(num: str, unit: str) -> float:
+    """Convert '16' + 'month' (or 'M', 'days', 'W', 'yrs', '') to years."""
+    u = unit.lower()
+    n = int(num)
+    if u.startswith("m"):  # month(s), or DICOM 'M'
+        return round(n / 12, 2)
+    if u.startswith("w"):
+        return round(n / 52, 2)
+    if u.startswith("d"):
+        return round(n / 365, 2)
+    return float(n)  # y, yr, yrs, year(s) or no unit
+
+
+def parse_clinical_reading(text: str) -> dict:
+    """Pull sex, age (in years) and the free-text finding out of a readings file.
+
+    Lines that state sex or age are parsed; every other non-empty line is
+    treated as the radiologist's finding. Anything not found is None, and
+    "O" (other/unknown) for sex is also None.
     """
     sex = age = None
     finding_lines = []
@@ -61,16 +84,15 @@ def parse_clinical_reading(text: str) -> dict:
         line = raw_line.strip()
         if not line:
             continue
-        low = line.lower()
-        sex_m = re.search(r"\b(female|male|f|m)\b", low)
-        age_m = re.search(r"(\d{1,3})\s*(?:y|yr|yrs|years?)?\b", low)
-        if "sex" in low or "age" in low or (sex_m and age_m and len(low) < 30):
-            if sex is None and sex_m:
-                sex = "F" if sex_m.group(1).startswith("f") else "M"
-            if age is None and "age" in low and age_m or age is None and sex_m and age_m:
-                age = int(age_m.group(1))
-            continue
-        finding_lines.append(line)
+        if m := _SEX_AGE_LINE.match(line):
+            sex = "F" if m["sex"].lower().startswith("f") else "M"
+            age = _age_in_years(m["num"], m["unit"])
+        elif m := _SEX_FIELD.search(line):
+            sex = {"f": "F", "m": "M"}.get(m["v"].lower())
+        elif m := _AGE_FIELD.search(line):
+            age = _age_in_years(m["num"], m["unit"])
+        else:
+            finding_lines.append(line)
     finding = " ".join(finding_lines) or None
     return {"sex": sex, "age": age, "finding": finding}
 

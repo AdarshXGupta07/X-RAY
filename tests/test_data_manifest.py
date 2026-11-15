@@ -43,6 +43,15 @@ def test_parse_filename():
         ("Patient's Sex: F\nPatient's Age: 061Y\nbilateral TB\n", "F", 61),
         ("male 35yrs\nnormal\n", "M", 35),
         ("female 8yrs\nPTB in the right upper field\n", "F", 8),
+        ("femal 32yrs\nnormal\n", "F", 32),  # real typo in the Shenzhen readings
+        ("female24yrs\nnormal\n", "F", 24),  # no space
+        ("Female, 28yrs  \t\nbilateral PTB", "F", 28),  # comma
+        ("Male , 50yrs  \t\nsecondary PTB", "M", 50),
+        ("male35yrs  \t\nPTB in the left upper field \t", "M", 35),
+        ("male 16month\nnormal", "M", 1.33),  # infants: months and days
+        ("female 64days\nnormal", "F", 0.18),
+        ("Patient's Sex: O\nPatient's Age: 005Y\nnormal\n", None, 5),  # O = unknown
+        ("Patient's Sex: M\nPatient's Age: 006M\nnormal\n", "M", 0.5),  # DICOM M = months
     ],
 )
 def test_parse_clinical_reading(text, sex, age):
