@@ -1,4 +1,4 @@
-"""Specification for tbshift.conformal (phase P3). Expected to fail until implemented.
+"""Specification for tbshift.conformal (phase P3).
 
 The simulations use TB-positive scores drawn from a standard normal, so the
 TRUE sensitivity of any threshold tau is known exactly: 1 - Phi(tau).
@@ -11,14 +11,15 @@ import pytest
 from scipy.stats import norm
 
 from tbshift.conformal import (
+    TRIVIAL_THRESHOLD,
+    certified_rank,
     certified_threshold,
     conformal_threshold,
+    marginal_rank,
     min_positives_certified,
     min_positives_marginal,
 )
 from tbshift.metrics import violation_rate
-
-pytestmark = pytest.mark.xfail(raises=NotImplementedError, strict=True, reason="phase P3 not written")
 
 ALPHA = 0.10  # target sensitivity 90%
 DELTA = 0.10  # allowed chance that a calibration set misses the target
@@ -104,3 +105,52 @@ def test_floors_agree_with_threshold_functions():
     m = min_positives_certified(ALPHA, DELTA)
     assert certified_threshold(rng.normal(size=m), ALPHA, DELTA) > -math.inf
     assert certified_threshold(rng.normal(size=m - 1), ALPHA, DELTA) == -math.inf
+
+
+# ------------------------------------------------------------- edge cases
+
+
+def test_marginal_rank_hand_values():
+    # n = 50, alpha = 0.10: floor(0.1 * 51) = 5 -> the 5th lowest TB score.
+    assert marginal_rank(50, 0.10) == 5
+    assert marginal_rank(8, 0.10) == 0  # floor(0.9) = 0 -> trivial
+    assert marginal_rank(9, 0.10) == 1
+
+
+def test_marginal_rank_survives_float_rounding():
+    # 0.29 * 100 is 28.999999999999996 in floating point; the answer is 29.
+    assert marginal_rank(99, 0.29) == 29
+
+
+def test_certified_rank_matches_binomial_definition():
+    from scipy.stats import binom
+
+    n, k = 200, certified_rank(200, ALPHA, DELTA)
+    assert binom.cdf(k - 1, n, ALPHA) <= DELTA < binom.cdf(k, n, ALPHA)
+
+
+def test_trivial_threshold_flags_everyone():
+    assert TRIVIAL_THRESHOLD == -math.inf
+    assert conformal_threshold([], ALPHA) == -math.inf
+    assert certified_threshold([], ALPHA, DELTA) == -math.inf
+
+
+def test_input_order_does_not_matter():
+    scores = np.random.default_rng(7).normal(size=60)
+    assert conformal_threshold(scores, ALPHA) == conformal_threshold(scores[::-1], ALPHA)
+
+
+def test_ties_are_handled():
+    scores = np.array([0.5] * 30)
+    assert conformal_threshold(scores, ALPHA) == 0.5  # flags all 30 (score >= 0.5)
+
+
+@pytest.mark.parametrize("alpha", [0.0, 1.0, -0.1, 1.5])
+def test_bad_alpha_raises(alpha):
+    with pytest.raises(ValueError):
+        conformal_threshold([0.1, 0.2], alpha)
+
+
+def test_nan_scores_raise():
+    with pytest.raises(ValueError):
+        conformal_threshold([0.1, float("nan")], ALPHA)
