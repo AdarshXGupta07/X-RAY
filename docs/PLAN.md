@@ -4,6 +4,8 @@
 **Status:** research prototype · public data only · no clinical validation · not a medical device
 **Plan written:** 2026-11-15 · **Week 1 starts:** Mon 2026-11-16 · **Length:** 10 weeks at ~12–15 h/week (stretch or compress to fit your submission date)
 
+**Current status lives in [PROGRESS.md](PROGRESS.md).** The checkboxes below are the roadmap, not the status.
+
 Companion files: [STUDY_TRACK.md](STUDY_TRACK.md) (what to learn each week + coding-round drills) · [INTERVIEW_PREP.md](INTERVIEW_PREP.md) (how to talk about this project)
 
 ---
@@ -14,7 +16,7 @@ These came out of checking your machine and your method. Each one is cheaper to 
 
 | # | Finding | What it means for you |
 |---|---|---|
-| 1 | **This folder was empty** when the plan was written. The layout in your brief does not exist at `D:\minor project\X-ray`. | Day 1 is scaffolding (or pointing me at the folder where it really lives). |
+| 1 | **The project started from an empty folder** on 2026-11-15. | Scaffolding was day 1; it is now done (see PROGRESS.md). |
 | 2 | **Your default Python is 3.14.** You also have 3.13. `python` is not on PATH, only `py`. | Build the venv with `py -3.13`. PyTorch wheels for the newest Python often lag; confirm on pytorch.org before choosing. |
 | 3 | **GPU is an RTX 2050 with 4 GB.** Free disk on D: is about 21 GB. | Enough for DenseNet-121 at 224 px, batch 8–16, mixed precision. Not enough for large datasets such as NIH ChestX-ray14. The plan uses a "cache the scores once" design so the GPU is needed for about one week in total. |
 | 4 | **Plain split-conformal does not control your "violation rate" metric.** It guarantees sensitivity ≥ target *on average over calibration sets*. Any single calibration set lands below target close to half the time, even with no shift and no bugs. | You need two thresholds: the marginal conformal one and a **certified (PAC) one** that holds with probability 1 − δ. The word "re-certification" in your title really means the second. Phase 3 covers both. |
@@ -66,7 +68,7 @@ Rule for every week: **nothing counts as done until it has a test, a notebook en
 
 ## 3. Phases
 
-Each task lists what "done" means. Function names are suggestions; the contracts are what matter. You write the code, I review it.
+Each task lists what "done" means. Function names are suggestions; the contracts are what matter, and each one is pinned down by a test in `tests/`.
 
 ### P0 — Setup and two gates (Week 1, days 1–3)
 
