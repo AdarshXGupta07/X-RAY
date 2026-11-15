@@ -106,3 +106,40 @@ Template: **Date · Question · What was done · Result · Conclusion · Next.**
 3. 8-bit vs 12-bit: no effect on our pipeline (ImageNet models expect 8-bit), but mention it when reporting the data.
 
 **Next.** Shenzhen download (needs approval: 3.77 GB, about 7.5 GB with extraction). Then splits and the image loader (rest of P1).
+
+---
+
+## 2026-11-16 — Second site: Shenzhen; P1 pipeline finished
+
+**Question.** Does Shenzhen match NLM's description, and how different are the two sites before any model sees them?
+
+**What was done.**
+
+- Downloaded Shenzhen file by file from NLM's official data host (the zip link returned an error page). 1,324 files, 0 failures, every PNG size equal to NLM's listing.
+- Built manifests for both sites; fixed the readings parser for four Shenzhen formats ("femal", "female24yrs", "Female, 28yrs", ages in months and days) and DICOM-style ages at Montgomery.
+- Split both sites (seed 0; 60/10/15/15) and cached centre-cropped 512 px copies (Montgomery 14 MB, Shenzhen 84 MB).
+- Looked at thumbnails of both sites.
+
+**Result.**
+
+| | Montgomery (USA) | Shenzhen (China) |
+|---|---|---|
+| Images (TB / normal) | 138 (58 / 80) | 662 (336 / 326) |
+| TB share | 42% | 51% |
+| Image size | 4020×4892 or 4892×4020 | 948–3001 px per side |
+| Landscape share, normal vs TB | 36% vs 21% | **58% vs 31%** |
+| Mean age, normal vs TB | 34.3 vs 48.1 | 33.1 vs 37.7 |
+| Male, normal vs TB | 32% vs 64% | 68% vs 68% |
+| Under 18, normal vs TB | 13 vs 4 | 24 vs 7 |
+| Calibration split TB cases (seed 0) | **9** | 50 |
+
+Other Shenzhen facts: 26 of 27 RGB-format files are TB (all are gray in content, so converting to grayscale removes it); all 21 images with a short side under 2,000 px are normal (children's "ap" views); burned-in "L" and "R" markers appear in both classes in a 24-image sample.
+
+**Conclusion.**
+
+1. **Orientation is a real shortcut risk at both sites.** Centre-cropping removes the shape cue, but text markers and field of view remain. P2 must test it: train a classifier on aspect ratio alone, and one on image corners only. If either beats chance clearly, report it and consider masking corners.
+2. **Image size is a shortcut at Shenzhen:** small images are all normal children. After resizing, their sharpness differs.
+3. **Site design consequence:** Montgomery's calibration split has 9 TB cases, exactly the marginal floor and far below the certified floor of 22. When Montgomery is the only source, the certified threshold cannot come from its own split. Options for P4: calibrate on the pooled source sites, use a larger calibration fraction at small sites, or report Montgomery-as-source with the marginal threshold only and say so.
+4. Demographic shift between sites (sex mix, age gap between classes) is part of the "site" in this study. The paper should describe it, not hide it.
+
+**Next.** P2: frozen DenseNet-121 features + logistic regression baseline, the shortcut checks above, then fine-tuning and the score cache.

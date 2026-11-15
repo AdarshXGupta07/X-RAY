@@ -36,3 +36,19 @@ Template: **Date · Symptom · Cause · How it was found · Fix · How to catch 
 - **How it was found.** Importing each scikit-learn submodule on its own a minute later: all loaded. Two further test runs passed.
 - **Fix.** None needed; it did not come back. Security settings were not changed.
 - **Next time.** If the error recurs, it is a Windows security decision, not a Python bug. Options are yours: check Windows Security → App & browser control, or replace the blocked piece (here, logistic regression) with NumPy/SciPy code.
+
+## 2026-11-15 — A "successful" download that was a web page
+
+- **Symptom.** The Shenzhen zip download finished instantly with exit code 0. The 3.6 GB "zip" was 13,854 bytes.
+- **Cause.** The server answered with HTTP 200 and an HTML error page instead of the file. `curl --fail` only catches 4xx/5xx status codes, so it reported success.
+- **How it was found.** The file size, then `file` reported "HTML document".
+- **Fix.** Downloaded from NLM's official per-file folders with a script that rejects HTML responses and checks every file's size against the listing.
+- **Next time.** After any download, check size and type (or a checksum) before trusting it. Exit code 0 is not proof.
+
+## 2026-11-16 — Clinical readings parser missed real formats
+
+- **Symptom.** 9, then 20 Shenzhen rows had no age or sex.
+- **Cause.** The readings use at least five layouts: "male 35yrs", "femal 32yrs" (typo), "female24yrs" (no space), "Female, 28yrs" (comma) and infant ages in months or days. A rewrite fixed the first ones and broke the comma rows.
+- **How it was found.** Printing the rows with missing values and their raw bytes (`od -c`).
+- **Fix.** One pattern for the Shenzhen line (`sex[\s,]*number unit`), unit conversion to years, and a test case for every real format found.
+- **Next time.** After a parser change, count missing values before and after; a drop in one place can hide a rise in another. Put each real-world example in a test.

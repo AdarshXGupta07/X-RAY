@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-15 (Montgomery data added).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (Shenzhen data and P1 pipeline added).
 
 ## Status by phase
 
@@ -9,9 +9,9 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-15 (Montgomery data added).
 |---|---|---|
 | P0 Setup | **Done** | Python 3.13 environment; PyTorch 2.14.1 (CUDA 12.6) sees the RTX 2050; package installs in editable mode; repo on GitHub |
 | P0 Gate A, literature | **First pass only** | [reading_log.md](reading_log.md): 13 related works logged from abstracts; none read in full |
-| P0 Gate B, datasets | **In progress** | [dataset_audit.md](dataset_audit.md): Montgomery downloaded and verified; Shenzhen terms checked, not downloaded; 4 candidates to inspect |
+| P0 Gate B, datasets | **In progress** | [dataset_audit.md](dataset_audit.md): Montgomery and Shenzhen downloaded and verified (2 sites); 4 candidates still to inspect |
 | P1 Metrics | **Done** | `src/tbshift/metrics.py`, 34 passing tests |
-| P1 Data | **Started** | `data/manifest.py` + 10 tests; Montgomery manifest built (138 images, counts match NLM). Splits and image loader not written |
+| P1 Data | **Done for 2 sites** | Manifests, stratified patient-level splits, 512 px cache and `CXRDataset` (37 tests). Both sites split and cached. EDA notebook not written |
 | P2 Model + score cache | Not started | |
 | P3 Calibration + conformal | **Done** | `calibration.py`, `conformal.py`, 41 passing tests; validity simulation run (below) |
 | P4 Leave-one-site-out | Not started | |
@@ -21,7 +21,7 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-15 (Montgomery data added).
 | P8 Demo | Not started | Folders only |
 | P9 Paper | Not started | |
 
-Test suite today: **119 passed, 27 expected-fail, 0 errors.**
+Test suite today: **146 passed, 27 expected-fail, 0 errors.**
 **The only results so far are synthetic** (validity simulation, no real images). Nothing in this repo supports any claim about TB detection.
 
 ## Validity simulation (synthetic, no shift)
@@ -117,6 +117,9 @@ You will be asked about this code in the viva. For each item: read the function,
 | Quantile matching | `recalibration.py: quantile_match`, `label_free_threshold` | CDFs and quantiles; mid-ranks; what "matching distributions" assumes | Why does matching fail when TB becomes more common, even though nothing is wrong with the scanner? |
 | Few-label threshold | `recalibration.py: few_label_threshold` | Conformal thresholds from target positives; binomial number of positives in a random sample | With 50 labels at 50% TB, why can the certified threshold still be trivial? |
 | Manifest builder | `data/manifest.py` | Why a manifest is the single source of truth; parsing file names with regular expressions; reading image headers without loading pixels | Why does the builder only look inside `CXR_png` folders? What would go wrong otherwise? |
+| Splits | `data/splits.py` | Stratified sampling; patient-level leakage; largest-remainder rounding; why a fixed seed | Why must one patient never appear in both train and test? Why does Montgomery's calibration split get only 9 TB cases? |
+| Resize cache | `data/preprocess.py` | Crop vs pad vs stretch; resampling filters; why cache | Why can padding leak the class at Montgomery and Shenzhen? |
+| PyTorch dataset | `data/dataset.py` | `Dataset` and `DataLoader`; ImageNet normalisation; augmentation; why no horizontal flip; pickling for Windows workers | Why copy one gray channel into three? Why does a lambda break `num_workers > 0` on Windows? |
 | Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
 
