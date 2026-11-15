@@ -49,4 +49,9 @@ pytest
 
 ## Data
 
-Datasets are downloaded separately from their original sources and are not redistributed here. See [docs/dataset_audit.md](docs/dataset_audit.md) for sources, licences and the same-site check.
+Datasets are downloaded separately from their original sources and are not redistributed here. See [docs/dataset_audit.md](docs/dataset_audit.md) for sources, licences and the same-site check, and [data/manifests/README.md](data/manifests/README.md) for building the manifests.
+
+The Montgomery County and Shenzhen chest X-ray sets are provided by the National Library of Medicine, National Institutes of Health, Bethesda, MD, USA (Shenzhen in collaboration with Shenzhen No. 3 People's Hospital, Guangdong Medical College, Shenzhen, China). Per NLM's terms they are not shared outside the research group; request them from NLM. Work using them should cite:
+
+- Jaeger S, et al. Automatic tuberculosis screening using chest radiographs. *IEEE Trans Med Imaging*. 2014;33(2):233–45. doi:10.1109/TMI.2013.2284099
+- Candemir S, et al. Lung segmentation in chest radiographs using anatomical atlases with nonrigid registration. *IEEE Trans Med Imaging*. 2014;33(2):577–90. doi:10.1109/TMI.2013.2290491

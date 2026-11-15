@@ -79,3 +79,30 @@ Template: **Date · Question · What was done · Result · Conclusion · Next.**
 **Caveat.** A toy world chosen to show each failure mode. It shows the code does what the theory says; it does not estimate how often anything happens at a real site.
 
 **Next.** Datasets (Gate B) → P1 data loaders → P2 score cache, then rerun P4–P6 on real cached scores. The domain-classifier detector is only tested on random embeddings so far.
+
+---
+
+## 2026-11-15 — First real data: Montgomery County
+
+**Question.** Does the downloaded Montgomery set match NLM's description, and does it hide any obvious shortcut?
+
+**What was done.**
+
+- Downloaded `NLM-MontgomeryCXRSet.zip` from NLM (616,853,875 bytes; SHA-256 `54601e952315d8f67383e9202a6e145997ade429f54f7e0af44b4e158714f424`). CRC check passed; no unsafe paths; extracted into `data/raw/montgomery/`.
+- Read the NLM ReadMe: do not share outside the research group; cite Jaeger et al. 2014 and Candemir et al. 2014 (both IEEE TMI 33(2)).
+- Built `data/manifests/montgomery.csv` with `python -m tbshift.data.manifest --site montgomery --raw data/raw/montgomery`.
+
+**Result.**
+
+- 138 images: 58 TB, 80 normal. Matches the ReadMe exactly. Every clinical reading agrees with its file-name label.
+- Images are 4020×4892 (97) or 4892×4020 (41). All are 8-bit grayscale (values 0–255), although the ReadMe says 12-bit.
+- Orientation differs by class: landscape in 29 of 80 normal (36%) vs 12 of 58 TB (21%).
+- Demographics differ by class: mean age 34.3 (normal) vs 48.1 (TB); male 32% (normal) vs 64% (TB). One reading lists sex as "O" and is left blank.
+
+**Conclusion.**
+
+1. Orientation is a possible shortcut. Resizing to a square stretches portrait and landscape images differently, and the classes have different mixes. Pad to square (or crop consistently) before resizing, and in P2 test whether a classifier can predict TB from orientation or aspect ratio alone.
+2. Age and sex differ strongly by class. The model may partly learn "older man" rather than "TB". Report it; consider an age- or sex-stratified check later.
+3. 8-bit vs 12-bit: no effect on our pipeline (ImageNet models expect 8-bit), but mention it when reporting the data.
+
+**Next.** Shenzhen download (needs approval: 3.77 GB, about 7.5 GB with extraction). Then splits and the image loader (rest of P1).
