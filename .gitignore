@@ -1,0 +1,50 @@
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+
+# --- Data: never commit datasets or medical images ---
+data/*
+!data/manifests/
+data/manifests/*
+!data/manifests/.gitkeep
+!data/manifests/README.md
+*.png
+*.jpg
+*.jpeg
+*.dcm
+*.zip
+*.tar
+*.tar.gz
+
+# --- Generated outputs (regenerate from code, do not version) ---
+artifacts/*
+!artifacts/.gitkeep
+results/*
+!results/.gitkeep
+*.pt
+*.pth
+*.npz
+*.npy
+
+# --- Frontend ---
+node_modules/
+frontend/dist/
+
+# --- Secrets and local settings ---
+.env
+.env.*
+!.env.example
+.claude/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
