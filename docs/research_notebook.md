@@ -30,3 +30,27 @@ Template: **Date · Question · What was done · Result · Conclusion · Next.**
 **Conclusion.** Gate A: not passed yet, needs full reads; the likely framing is an empirical and statistical study, not a new method. Gate B: two sites confirmed, four more candidates to inspect.
 
 **Next.** Decide which datasets to download; read the closest preprint (reading log C1); implement the calibration and conformal modules against their tests.
+
+---
+
+## 2026-11-15 — P3: calibration, conformal thresholds, validity simulation
+
+**Question.** Do the two rule-out thresholds keep their promises when there is no site shift?
+
+**What was done.**
+
+- `calibration.py`: temperature scaling fitted by minimising NLL over log T (bounds 0.01–100).
+- `conformal.py`: marginal threshold, k = floor(alpha(n + 1)); certified threshold, largest k with P(Binomial(n, alpha) ≤ k − 1) ≤ delta; both return −inf below their label floor.
+- `experiments/validity_simulation.py`: standard-normal TB scores, so true sensitivity is exact; 5,000 calibration sets per size; seed 0.
+
+**Result** (alpha = 0.10, delta = 0.10; full table in PROGRESS.md):
+
+- Marginal: mean sensitivity 0.900–0.913; violation rate 0.34–0.46.
+- Certified: violation rate 0.000–0.095 (≤ 0.10 at every size); mean sensitivity 0.925–0.967 once non-trivial.
+- Label floors confirmed by simulation: 9 positives (marginal), 22 (certified).
+
+**Conclusion.** The control behaves exactly as the theory says. "Source conformal is valid" and "source conformal violates the target ~40% of the time" are both true, so the paper must define violation precisely and report the certified threshold alongside the marginal one. Any real-data violation rate must be compared with these no-shift baselines, not with zero.
+
+**Caveat.** Synthetic, continuous scores. Real scores have ties and only 58 TB cases at Montgomery, so results there will be noisier.
+
+**Next.** Shift detection (P5) and recalibration (P6) can be written and tested on synthetic scores now; real experiments wait for data.
