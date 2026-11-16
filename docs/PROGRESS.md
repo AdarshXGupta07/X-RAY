@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P7 degradations added).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (five training seeds added; this changes the RQ1 conclusion).
 
 ## Status by phase
 
@@ -21,8 +21,32 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P7 degradations added).
 | P8 Demo | Not started | Folders only |
 | P9 Paper | Not started | |
 
-Test suite today: **202 passed, 0 expected-fail, 0 errors.** Every planned research module is now implemented.
+Test suite today: **206 passed, 0 expected-fail, 0 errors.** Every planned research module is now implemented.
 **First real-data results exist (P2, below)**, from two public datasets and one seed. They are a research prototype's first pass, not clinical evidence.
+
+## Five training seeds: the headline result (read this first)
+
+Seeds 0–4 retrain every P2 model with different training randomness (initial head weights, batch order, augmentation); data splits are identical. P4 and P5/P6 were rerun on each seed's score cache. Command: `python -m tbshift.experiments.multi_seed` (about 4 minutes on CPU). Outputs: `results/multi_seed/`.
+
+**Trained on Shenzhen, no mask; certified 90% threshold; 1,000 calibration draws per seed:**
+
+| Seed | Shenzhen control: violation | Montgomery AUC | Montgomery: violation | Montgomery: sensitivity | Montgomery: specificity |
+|---|---|---|---|---|---|
+| 0 | 0.066 | 0.871 | 0.000 | 0.997 | 0.053 |
+| 1 | 0.057 | 0.842 | 0.001 | 0.984 | 0.125 |
+| **2** | **0.054** | **0.847** | **1.000** | **0.771** | 0.717 |
+| 3 | 0.064 | 0.839 | 0.112 | 0.961 | 0.336 |
+| 4 | 0.069 | 0.843 | 0.043 | 0.980 | 0.145 |
+
+1. **Silent failure of the safety promise is real, and it depends on the training run.** Seed 2's threshold missed 90% sensitivity at Montgomery in every draw (77% sensitivity). At the source it passed the control like every other seed (5.4%), and its unseen-site AUC (0.847) looks just like the others'. Nothing visible at the source separates it from the safe seeds.
+2. **The other four seeds fail the other way:** sensitivity is kept but specificity falls to 0.05–0.34.
+3. **The label-free detector does not identify the failing seed.** With 50 unlabelled images it fires in 99–100% of draws for every seed. With 20 images it fires 98% for seed 2 versus 52–75% for the others: a hint, not a test.
+4. **Few-label re-certification (69 Montgomery labels, 29 TB) held for all 10 models** (5 seeds × 2 masks): violation 0.114–0.133 on the evaluation half, specificity 0.09–0.36. Label-free repair violated in 27–80% of draws depending on seed.
+5. **The corner mask does not help transfer:** paired within seed, it lowered Montgomery AUC in 5 of 5 Shenzhen seeds (mean −0.037) and in 4 of 5 Montgomery seeds (mean −0.042).
+
+**Across-seed means (sd)** for P2: trained on Shenzhen, AUC 0.918 (0.010) at Shenzhen test, 0.849 (0.013) at Montgomery; trained on Montgomery, 0.852 (0.036) and 0.779 (0.043). Frozen baselines do not vary with seed (no training randomness).
+
+This supersedes the single-seed conclusions below that "the certified sensitivity promise never failed". It did not fail for seed 0; it failed for seed 2.
 
 ## P7: controlled shifts by degrading images (Shenzhen model, held-out Shenzhen pool)
 
@@ -247,6 +271,7 @@ You will be asked about this code in the viva. For each item: read the function,
 | Real-data detection and repair | `experiments/real_shift.py` | Adaptation vs evaluation split; power and false-alarm rate; why each method may only see the adaptation half | Why must the few-label images be excluded from evaluation? Why did label-free repair break sensitivity here? |
 | Degradations | `degradations.py` | Gaussian noise, Gaussian blur, JPEG compression, contrast; what each mimics in a real hospital | Why define blur strength relative to image size? |
 | Degradation study | `experiments/p7_degradations.py` | Controlled experiments; score compression; why calibrate on clean and evaluate on degraded | Explain in one minute why heavy blur did not break the certified sensitivity promise but did destroy specificity. |
+| Multi-seed aggregation | `experiments/multi_seed.py` | Training randomness; mean and standard deviation across runs; paired comparisons | Why did one seed break the promise when four did not, and why could you not tell from the source data? |
 | Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
 

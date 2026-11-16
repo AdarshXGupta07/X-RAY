@@ -76,3 +76,11 @@ Template: **Date · Symptom · Cause · How it was found · Fix · How to catch 
 - **How it was found.** The traceback pointed into `torch/optim/optimizer.py`; reading that function showed it runs regardless of the training device. Repeating the suite several times exposed the intermittency.
 - **Fix.** `tests/conftest.py` switches that health check off for the test session only (it only matters for CUDA-graph capture, which no test uses). Six full runs in a row passed. Real training is unchanged.
 - **Next time.** A failure that comes and goes usually depends on something outside the test (shared GPU, memory, timing). Run the suite several times before and after a fix, and keep unit tests independent of the GPU.
+
+## 2026-11-16 — Training crashed with "not enough memory" (RAM, not GPU)
+
+- **Symptom.** During the multi-seed runs: `DefaultCPUAllocator: not enough memory`, then `CUDA out of memory ... 2.33 GiB is free`, and earlier "The paging file is too small" when running tests at the same time as training.
+- **Cause.** Windows ran out of commit memory (RAM plus page file): 0.1 GB of 27.9 GB free. The Ollama model server held about 6 GB, the browser about 2 GB, and each PyTorch process about 2–4 GB including the CUDA libraries. A "CUDA out of memory" error with plenty of free GPU memory was really a host-memory failure.
+- **How it was found.** `Get-CimInstance Win32_OperatingSystem` (free physical and virtual memory) and the process list sorted by memory.
+- **Fix.** Ran one training process at a time, with nothing else heavy alongside, and a retry. The runner now saves its summary after every model, so a crash loses only the model in progress. Seeds reproduced exactly on rerun (same AUCs), confirming the seeding.
+- **Next time.** Before long GPU jobs, check free commit memory, not just GPU memory, and close other large programs (Ollama). Save progress incrementally in any long job.

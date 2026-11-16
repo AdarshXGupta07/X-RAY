@@ -247,3 +247,32 @@ Distribution check (all 100 clean TB cases): certified threshold −4.87. TB sco
 **Caveats.** One model, one seed; evaluation quarters have about 25 TB cases, so violation estimates carry roughly ±0.03 of their own noise; degradations are simulated.
 
 **Next.** Experiments for the core questions are now complete for two sites. Remaining: more P2 seeds (corner mask question), more sites if possible, then the demo (P8) and the paper (P9). Per the plan, freeze experiment design here; new ideas go to "future work".
+
+---
+
+## 2026-11-16 — Five training seeds (changes the RQ1 conclusion)
+
+**Question.** Are the P2–P6 results properties of the method, or of one training run? Does the corner mask help?
+
+**What was done.** Added `--seed` / `--run-name` to the P2 runner (splits unchanged; only training randomness varies) and made it save after every model. Trained seeds 1–4 (seed 0 existed). `experiments/multi_seed.py` reran P4 and P5/P6 (1,000 draws each) on every seed's cache and reports mean, sd and paired mask differences. Seeds 2–4 had to be rerun one at a time because the machine ran out of memory (bug log).
+
+**Result.** Tables in PROGRESS.md. Key numbers (trained on Shenzhen, no mask):
+
+- Certified violation at Montgomery per seed: 0.000, 0.001, **1.000**, 0.112, 0.043. Shenzhen control: 0.054–0.069 for all seeds.
+- Seed 2 at Montgomery: sensitivity 0.771, specificity 0.717, AUC 0.847. Other seeds: sensitivity 0.96–1.00, specificity 0.05–0.34.
+- KS power at batch 50: 0.989–1.000 for every seed; at batch 20: seed 2 0.983, others 0.52–0.75.
+- Few-label certified, 69 labels: violation 0.114–0.133 for all 10 models.
+- Corner mask, paired: Montgomery AUC lower in 5/5 Shenzhen seeds (−0.037) and 4/5 Montgomery seeds (−0.042).
+
+**Conclusion.**
+
+1. RQ1, revised: a source-certified sensitivity promise can fail silently at a new hospital. Here it happened for 1 of 5 equally good training runs. The source-side evidence (control violation, AUC) looked identical for the run that failed and the runs that did not.
+2. The failure is not predictable from accuracy: seed 2's unseen-site AUC was average. What differs is where the model places the new site's TB scores relative to a threshold learnt elsewhere.
+3. RQ2: the detector sees "different" for every seed and cannot isolate the harmful one at practical batch sizes.
+4. RQ3: few-label re-certification is the only method that held for every model. Cost: about 29 TB-positive labels from the new site.
+5. Single-run results in a site-shift study can be misleading in either direction. Report across seeds.
+6. Drop the corner mask from the main pipeline; report it as a checked-and-rejected mitigation.
+
+**Caveats.** Five seeds is still few; Montgomery is small (58 TB, 29 in each evaluation half), so per-seed violation estimates carry their own noise; one architecture.
+
+**Next.** Experiments are frozen per the plan. Next: demo (P8) and paper (P9). Use the multi-seed tables as the main results.
