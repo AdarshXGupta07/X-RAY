@@ -1,11 +1,9 @@
-"""Specification for tbshift.degradations (phase P7). Expected to fail until implemented."""
+"""Specification for tbshift.degradations (phase P7)."""
 
 import numpy as np
 import pytest
 
 from tbshift.degradations import DEGRADATIONS, degrade, gaussian_blur, gaussian_noise
-
-pytestmark = pytest.mark.xfail(raises=NotImplementedError, strict=True, reason="phase P7 not written")
 
 
 @pytest.fixture
@@ -59,3 +57,17 @@ def test_unknown_degradation_raises_value_error(image):
     # This test must fail with NotImplementedError today and pass once written.
     with pytest.raises(ValueError):
         degrade(image, "sepia", 1)
+
+
+def test_blur_scales_with_image_size():
+    # The same severity should blur the same fraction of the anatomy at 224 and 448 px.
+    small = np.zeros((224, 224), np.float32); small[:, 112:] = 1.0
+    big = np.zeros((448, 448), np.float32); big[:, 224:] = 1.0
+    width = lambda a: int(((a > 0.05) & (a < 0.95)).sum(axis=1)[0])
+    assert width(gaussian_blur(big, 4)) == pytest.approx(2 * width(gaussian_blur(small, 4)), abs=2)
+
+
+@pytest.mark.parametrize("bad", [6, -1])
+def test_bad_severity_raises(image, bad):
+    with pytest.raises(ValueError):
+        degrade(image, "noise", bad)
