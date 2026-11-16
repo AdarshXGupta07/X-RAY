@@ -48,12 +48,21 @@ def to_square(img: Image.Image, mode: str = "crop") -> Image.Image:
     return canvas
 
 
-def preprocess_image(path: Path, size: int = 512, mode: str = "crop") -> Image.Image:
-    """Load one X-ray as 8-bit grayscale, make it square, resize to size x size."""
-    with Image.open(path) as img:
-        gray = img.convert("L")  # any bit depth -> 8-bit grayscale
+def prepare_image(img: Image.Image, size: int = 512, mode: str = "crop") -> Image.Image:
+    """Convert an opened image to 8-bit grayscale, make it square, resize to size x size.
+
+    The demo calls this on uploaded images, so they go through exactly the
+    same steps as the training cache.
+    """
+    gray = img.convert("L")  # any bit depth -> 8-bit grayscale
     # LANCZOS gives a sharp, alias-free downsample; it is slow but runs only once.
     return to_square(gray, mode).resize((size, size), Image.Resampling.LANCZOS)
+
+
+def preprocess_image(path: Path, size: int = 512, mode: str = "crop") -> Image.Image:
+    """Load one X-ray from disk and apply ``prepare_image``."""
+    with Image.open(path) as img:
+        return prepare_image(img, size, mode)
 
 
 def build_cache(
