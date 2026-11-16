@@ -46,3 +46,15 @@ def test_freeze_backbone_leaves_head_trainable():
     set_backbone_trainable(model, False)
     assert not any(p.requires_grad for p in model.features.parameters())
     assert all(p.requires_grad for p in model.classifier.parameters())
+
+
+def test_save_summary_merges_and_replaces(tmp_path):
+    import pandas as pd
+
+    from tbshift.experiments.p2_models import save_summary
+
+    path = tmp_path / "summary.csv"
+    save_summary(path, pd.DataFrame([{"fold": "a", "mask": "none", "auc": 0.7}]))
+    save_summary(path, pd.DataFrame([{"fold": "b", "mask": "none", "auc": 0.8}]))
+    out = save_summary(path, pd.DataFrame([{"fold": "a", "mask": "none", "auc": 0.9}]))  # rerun of a
+    assert out.set_index("fold")["auc"].to_dict() == {"a": 0.9, "b": 0.8}

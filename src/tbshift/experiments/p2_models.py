@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -122,18 +121,40 @@ def write_score_cache(model, frames, cfg, mask, device, out_dir: Path) -> dict[s
     return logits
 
 
+def save_summary(path: Path, new_rows: pd.DataFrame) -> pd.DataFrame:
+    """Merge rows into summary.csv, replacing any existing row for the same fold and mask."""
+    if path.exists():
+        old = pd.read_csv(path)
+        keys = ["fold", "mask"]
+        old = old[~old.set_index(keys).index.isin(new_rows.set_index(keys).index)]
+        new_rows = pd.concat([old, new_rows], ignore_index=True)
+    new_rows = new_rows.sort_values(["fold", "mask"]).reset_index(drop=True)
+    new_rows.to_csv(path, index=False)
+    return new_rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="P2: train per fold and write the score cache")
     parser.add_argument("--config", default="configs/p2_densenet.yaml")
     parser.add_argument("--only-fold", help="train on this site only (for quick checks)")
     parser.add_argument("--only-mask", help="run only this corner-mask setting")
+    parser.add_argument("--seed", type=int, help="override the training seed in the config")
+    parser.add_argument("--run-name", help="override run_name (default: config value, plus _s<seed> "
+                                           "when --seed differs from the config)")
     args = parser.parse_args()
 
     cfg = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
+    if args.seed is not None and args.seed != cfg["seed"]:
+        # Only training randomness changes (initial head weights, batch order,
+        # augmentation). The data splits come from the manifests and stay fixed.
+        cfg["run_name"] = f"{cfg['run_name']}_s{args.seed}"
+        cfg["seed"] = args.seed
+    if args.run_name:
+        cfg["run_name"] = args.run_name
     run = cfg["run_name"]
     results_dir = Path("results") / run
     results_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(args.config, results_dir / "config.yaml")
+    (results_dir / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
     log_file = open(results_dir / "log.txt", "a", encoding="utf-8")  # noqa: SIM115
 
     def log(msg: str) -> None:
@@ -185,18 +206,14 @@ def main() -> None:
                 f"{row['ft_auc_source_test']:.3f}, target AUC {row['ft_auc_target']:.3f}, "
                 f"{row['ft_minutes']:.1f} min")
             rows.append(row)
+            # Save after every finished model, so a crash later in the run
+            # (e.g. running out of RAM) loses only the model in progress.
+            summary = save_summary(results_dir / "summary.csv", pd.DataFrame([row]))
             del model
             torch.cuda.empty_cache()
 
-    summary = pd.DataFrame(rows)
-    path = results_dir / "summary.csv"
-    if path.exists() and (args.only_fold or args.only_mask):
-        old = pd.read_csv(path)
-        keys = ["fold", "mask"]
-        old = old[~old.set_index(keys).index.isin(summary.set_index(keys).index)]
-        summary = pd.concat([old, summary], ignore_index=True)
-    summary.to_csv(path, index=False)
-    log("\n" + summary.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
+    if rows:
+        log("\n" + summary.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
     log_file.close()
 
 
