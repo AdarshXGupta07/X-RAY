@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (Shenzhen data and P1 pipeline added).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P2 model, shortcut checks and score cache added).
 
 ## Status by phase
 
@@ -12,7 +12,7 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (Shenzhen data and P1 pipe
 | P0 Gate B, datasets | **In progress** | [dataset_audit.md](dataset_audit.md): Montgomery and Shenzhen downloaded and verified (2 sites); 4 candidates still to inspect |
 | P1 Metrics | **Done** | `src/tbshift/metrics.py`, 34 passing tests |
 | P1 Data | **Done for 2 sites** | Manifests, stratified patient-level splits, 512 px cache and `CXRDataset` (37 tests). Both sites split and cached. EDA notebook not written |
-| P2 Model + score cache | Not started | |
+| P2 Model + score cache | **Done (first pass)** | DenseNet-121, frozen baseline + fine-tuning per fold, with and without corner mask; score cache verified against manifests; shortcut checks |
 | P3 Calibration + conformal | **Done** | `calibration.py`, `conformal.py`, 41 passing tests; validity simulation run (below) |
 | P4 Leave-one-site-out | Not started | |
 | P5 Shift detection | **Done on synthetic data** | `shift.py`, 14 passing tests; real-data run waits for P2 |
@@ -21,8 +21,40 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (Shenzhen data and P1 pipe
 | P8 Demo | Not started | Folders only |
 | P9 Paper | Not started | |
 
-Test suite today: **146 passed, 27 expected-fail, 0 errors.**
-**The only results so far are synthetic** (validity simulation, no real images). Nothing in this repo supports any claim about TB detection.
+Test suite today: **157 passed, 27 expected-fail, 0 errors.**
+**First real-data results exist (P2, below)**, from two public datasets and one seed. They are a research prototype's first pass, not clinical evidence.
+
+## P2: first real-data results (two sites, seed 0)
+
+Commands: `python -m tbshift.experiments.shortcut_checks`, `python -m tbshift.experiments.p2_models`, `python -m tbshift.experiments.p2_report`. Outputs in `results/` and `artifacts/` (git-ignored).
+
+**Shortcut checks** (cross-validated AUC for predicting TB from one region; 0.5 = no signal):
+
+| Region | Montgomery | Shenzhen |
+|---|---|---|
+| Top-left corner only (marker area) | **0.895** | 0.713 |
+| Upper lung fields (control) | 0.727 | 0.802 |
+| Image shape (orientation, size) | 0.535 | 0.695 |
+| Age and sex | 0.742 | 0.546 |
+| Which site (both sites pooled) | 1.000 | |
+
+**Models** (AUC with 95% bootstrap interval; fine-tuned DenseNet-121, no corner mask):
+
+| Trained on → evaluated on | AUC | Certified 90% threshold: sensitivity | Specificity |
+|---|---|---|---|
+| Shenzhen → Shenzhen test (99) | 0.914 (0.849–0.964) | 0.90 | 0.71 |
+| Shenzhen → Montgomery (138) | 0.871 (0.808–0.924) | 1.00 | **0.26** |
+| Montgomery → Montgomery test (20) | 0.812 (0.573–0.979) | 1.00 (trivial) | 0.00 |
+| Montgomery → Shenzhen (662) | 0.714 (0.674–0.751) | 1.00 (trivial) | 0.00 |
+
+Full table, including the frozen baseline, the corner-mask runs and the marginal threshold: `results/p2_densenet/summary.csv` and `report.csv`.
+
+What it shows:
+
+1. **A marker shortcut exists at Montgomery.** One corner predicts TB better than the lungs do.
+2. **At the new site the sensitivity promise held in this draw, but specificity collapsed** (0.71 → 0.26). Montgomery's scores sit higher than Shenzhen's: the "harmless shift" pattern from the synthetic study, which is harmless for TB cases and costly for everyone else.
+3. **Montgomery cannot be a calibration source on its own.** 9 calibration TB cases is below the floor of 22, so the certified threshold flags everyone, as predicted.
+4. **The corner mask did not help consistently** with only these runs: it raised the Montgomery-trained model's unseen-site AUC (0.714 → 0.754) and lowered the Shenzhen-trained one's (0.871 → 0.798). One seed, wide intervals: not a conclusion yet.
 
 ## Validity simulation (synthetic, no shift)
 
@@ -120,6 +152,10 @@ You will be asked about this code in the viva. For each item: read the function,
 | Splits | `data/splits.py` | Stratified sampling; patient-level leakage; largest-remainder rounding; why a fixed seed | Why must one patient never appear in both train and test? Why does Montgomery's calibration split get only 9 TB cases? |
 | Resize cache | `data/preprocess.py` | Crop vs pad vs stretch; resampling filters; why cache | Why can padding leak the class at Montgomery and Shenzhen? |
 | PyTorch dataset | `data/dataset.py` | `Dataset` and `DataLoader`; ImageNet normalisation; augmentation; why no horizontal flip; pickling for Windows workers | Why copy one gray channel into three? Why does a lambda break `num_workers > 0` on Windows? |
+| DenseNet-121 wrapper | `models/densenet.py` | Transfer learning; replacing a classification head; feature vectors (embeddings); memory-efficient DenseNet | What does the 1024-number embedding represent, and why is it cached? |
+| Training loop | `training/train.py` | Forward, loss, backward, step; BCE with logits; AdamW; mixed precision; early stopping | Why restore the best-validation weights? Why is early stopping on 14 validation images unreliable? |
+| Shortcut checks | `experiments/shortcut_checks.py` | Shortcut learning; positive and negative controls; cross-validation | Why is a corner that beats the lung fields a red flag? |
+| P2 runner and report | `experiments/p2_models.py`, `p2_report.py` | Leave-one-site-out; frozen vs fine-tuned features; score caching | Why did fine-tuning help when trained on Shenzhen but hurt when trained on Montgomery? |
 | Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
 

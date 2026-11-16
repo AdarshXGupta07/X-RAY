@@ -143,3 +143,34 @@ Other Shenzhen facts: 26 of 27 RGB-format files are TB (all are gray in content,
 4. Demographic shift between sites (sex mix, age gap between classes) is part of the "site" in this study. The paper should describe it, not hide it.
 
 **Next.** P2: frozen DenseNet-121 features + logistic regression baseline, the shortcut checks above, then fine-tuning and the score cache.
+
+---
+
+## 2026-11-16 — P2: model, shortcut checks and score cache
+
+**Question.** Does a fixed DenseNet-121 learn TB rather than site or marker cues, and what does a source-calibrated 90%-sensitivity threshold do at the other site?
+
+**What was done.**
+
+- Environment: switched to Anaconda's scientific stack (Smart App Control blocked newer pip wheels); removed the duplicate OpenMP runtime. 157 tests pass.
+- Shortcut checks on the cached images, with lung-field patches as positive control.
+- Per fold (train on one site) and per corner-mask setting: frozen ImageNet features + logistic regression (C on the validation split), then fine-tuning (2 head epochs, then full network, AdamW 1e-4, early stopping on validation AUC, patience 5, batch 16, 224 px, mixed precision; 641 MB peak GPU memory). Seed 0.
+- Score cache for every image of both sites under each model; verified image by image against the manifests.
+- `p2_report.py`: AUC with bootstrap intervals; marginal and certified thresholds from the source calibration split's TB cases, applied to the source test split and the unseen site.
+
+**Result.** Tables in PROGRESS.md. Key numbers:
+
+- Montgomery top-left corner alone: AUC 0.895 (0.834–0.944), above its upper lung fields 0.727. Site from a 16×16 thumbnail: AUC 1.000.
+- Trained on Shenzhen, no mask: AUC 0.914 on its test split, 0.871 on Montgomery. Certified threshold: sensitivity 0.90 / specificity 0.71 at Shenzhen test; 1.00 / 0.26 at Montgomery.
+- Trained on Montgomery: AUC 0.714 on Shenzhen (frozen baseline 0.847: fine-tuning on 83 images made transfer worse). Certified threshold trivial (9 calibration TB cases).
+- Corner mask: mixed effect (see PROGRESS.md).
+
+**Conclusion.**
+
+1. Direction Shenzhen → Montgomery is a real, measurable site shift. The cost appeared in specificity, not sensitivity. RQ1 must report both: "the promise survived" can hide a threshold that clears almost nobody.
+2. Montgomery → Shenzhen cannot be certified from Montgomery alone. P4 must either pool calibration data, use few-label re-certification, or present this direction with the marginal threshold and say why.
+3. The marker shortcut is real at Montgomery. With one seed and two folds the corner mask's effect is not resolved; it needs several seeds.
+
+**Caveats.** One seed. Montgomery's validation split has 14 images, and its validation AUC reached 1.000, so early stopping there is close to arbitrary. Test splits are small (Montgomery 20, Shenzhen 99). Intervals are wide.
+
+**Next.** P4: repeat the calibration/test split many times on the cached scores (cheap), add temperature scaling, and measure violation rate and specificity per direction. Run 3–5 seeds of P2 for the mask comparison when time allows.
