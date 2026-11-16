@@ -52,3 +52,19 @@ Template: **Date · Symptom · Cause · How it was found · Fix · How to catch 
 - **How it was found.** Printing the rows with missing values and their raw bytes (`od -c`).
 - **Fix.** One pattern for the Shenzhen line (`sex[\s,]*number unit`), unit conversion to years, and a test case for every real format found.
 - **Next time.** After a parser change, count missing values before and after; a drop in one place can hide a rise in another. Put each real-world example in a test.
+
+## 2026-11-16 — Smart App Control blocks SciPy and scikit-learn at random
+
+- **Symptom.** Imports failed at random with `ImportError: DLL load failed ... An Application Control policy has blocked this file`, each time on a different file (`_ckdtree`, `_highs_options`, `_superlu`, `_libsvm_sparse`). Three runs in a row failed.
+- **Cause.** The Windows Code Integrity log (event IDs 3033/3077) shows the files "did not meet the Enterprise signing level requirements". Smart App Control is on (registry state 1). It blocks unsigned compiled files that Microsoft has no reputation data for. The newest pip wheels are the least known.
+- **How it was found.** Reading `Microsoft-Windows-CodeIntegrity/Operational` with `Get-WinEvent`, then comparing: Anaconda's own SciPy 1.16.3 and scikit-learn 1.7.2 imported 5 out of 5 times.
+- **Fix.** The security setting was left as it is. The project environment now uses Anaconda's NumPy, SciPy, scikit-learn, pandas, matplotlib, Pillow and PyYAML (`include-system-site-packages = true`, pip copies uninstalled); only PyTorch comes from pip. The full test suite then passed repeatedly.
+- **Next time.** On Windows, check the Code Integrity log as soon as an "Application Control" error appears. Prefer long-established builds over brand-new wheels.
+
+## 2026-11-16 — Two OpenMP runtimes: worker crash and "OMP Error #15"
+
+- **Symptom.** `DataLoader` workers died with `OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized`. Later the main process crashed the same way when PyTorch was imported before NumPy.
+- **Cause.** Anaconda's NumPy (MKL) and PyTorch each ship their own `libiomp5md.dll`. `psutil` showed both loaded in one process even when the program happened not to crash.
+- **How it was found.** Listing the process's loaded files with `psutil.Process().memory_maps()` and filtering for `iomp5`.
+- **Fix.** Renamed `torch\lib\libiomp5md.dll` to `.bak`. PyTorch then loads Anaconda's copy from `anaconda3\Library\bin`, so exactly one runtime is loaded in either import order. Training also uses `num_workers=0`. The `KMP_DUPLICATE_LIB_OK=TRUE` workaround was rejected: Intel warns it can silently give wrong results.
+- **Next time.** When mixing conda and pip, count loaded copies of shared runtimes instead of assuming. "It didn't crash" does not mean only one copy is loaded.

@@ -17,21 +17,36 @@ A chest X-ray model is tuned at some hospitals to catch at least ~90% of TB case
 
 Work in progress. See [docs/PROGRESS.md](docs/PROGRESS.md) for what is done and [docs/PLAN.md](docs/PLAN.md) for the roadmap. No experimental results exist yet.
 
-## Setup (Windows, Python 3.13)
+## Setup (Windows, Anaconda Python 3.13)
+
+This machine has Windows **Smart App Control** switched on. It intermittently blocks
+freshly downloaded compiled Python files (the newest SciPy and scikit-learn wheels
+from pip), while Anaconda's own builds load reliably. So the environment uses
+Anaconda's scientific stack and installs only PyTorch with pip.
 
 ```powershell
-py -3.13 -m venv .venv
+# 1. Virtual environment that can see Anaconda's packages
+C:\Users\<you>\anaconda3\python.exe -m venv --system-site-packages .venv
 .\.venv\Scripts\Activate.ps1
 
-# 1. PyTorch first, from the CUDA index (pick the build for your GPU at pytorch.org)
+# 2. PyTorch with CUDA (pick the build for your GPU at pytorch.org)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 
-# 2. This package, in editable mode, with dev tools
-pip install -e ".[dev]"
+# 3. This package without re-installing NumPy/SciPy/scikit-learn/pandas from pip
+pip install -e . --no-deps
+pip install ruff
 
-# 3. Run the tests
+# 4. One OpenMP runtime only: Anaconda's NumPy and PyTorch each ship libiomp5md.dll,
+#    and loading both crashes CPU code. Set PyTorch's copy aside; PyTorch then
+#    finds Anaconda's copy in anaconda3\Library\bin.
+Rename-Item .venv\Lib\site-packages\torch\lib\libiomp5md.dll libiomp5md.dll.bak
+
+# 5. Run the tests
 pytest
 ```
+
+On a machine without Smart App Control, the plain route also works:
+`pip install torch torchvision --index-url ...` followed by `pip install -e ".[dev]"`.
 
 ## Layout
 
