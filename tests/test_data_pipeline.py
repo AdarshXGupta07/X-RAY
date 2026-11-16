@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL import Image
 
-from tbshift.data.dataset import IMAGENET_MEAN, IMAGENET_STD, CXRDataset
+from tbshift.data.dataset import IMAGENET_MEAN, IMAGENET_STD, CornerMask, CXRDataset
 from tbshift.data.preprocess import build_cache, preprocess_image, to_square
 from tbshift.data.splits import SPLITS, allocate, assign_splits, summarize
 
@@ -164,10 +164,35 @@ def test_dataloader_batches(cached_frame):
     assert x.shape == (2, 3, 32, 32) and y.shape == (2,)
 
 
-def test_dataset_works_with_worker_processes(cached_frame):
-    # On Windows, workers are new processes and every transform must be picklable.
+def test_dataset_is_picklable(cached_frame):
+    # DataLoader workers on Windows receive the dataset by pickling, so every
+    # transform must be picklable (no lambdas). We train with num_workers=0
+    # because Anaconda's NumPy and PyTorch each ship an OpenMP runtime
+    # (libiomp5md.dll) and a worker process that loads both aborts.
+    import pickle
+
     root, frame = cached_frame
-    loader = torch.utils.data.DataLoader(
-        CXRDataset(frame, root=root, image_size=32), batch_size=2, num_workers=1
-    )
-    assert next(iter(loader))[0].shape == (2, 3, 32, 32)
+    ds = pickle.loads(pickle.dumps(CXRDataset(frame, root=root, image_size=32, corner_mask=(0.25, 0.12))))
+    assert ds[0][0].shape == (3, 32, 32)
+
+
+def test_corner_mask_blacks_out_corners_only():
+    x = torch.ones(1, 100, 100)
+    out = CornerMask(0.25, 0.12)(x)
+    assert out[0, :12, :25].max() == 0 and out[0, -12:, -25:].max() == 0
+    assert out[0, 50, 50] == 1 and out[0, :12, 40:60].min() == 1  # top centre kept
+    assert x.min() == 1  # input not modified
+
+
+def test_dataset_with_corner_mask(cached_frame):
+    root, frame = cached_frame
+    x, _ = CXRDataset(frame, root=root, image_size=32, corner_mask=(0.25, 0.12))[0]
+    mean = torch.tensor(IMAGENET_MEAN).view(3, 1, 1)
+    std = torch.tensor(IMAGENET_STD).view(3, 1, 1)
+    raw = x * std + mean
+    assert raw[:, :4, :8].abs().max() < 1e-5  # masked corner is black
+
+
+def test_corner_mask_rejects_bad_fractions():
+    with pytest.raises(ValueError):
+        CornerMask(0.6, 0.1)
