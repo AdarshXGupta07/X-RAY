@@ -35,6 +35,7 @@ Test suite today: **233 passed, 0 expected-fail, 0 errors.** Every planned resea
 | Tables | T1 datasets, T2 main per-seed results, T3 model quality and corner mask, T4 degradations |
 | Related work | Drafted from the reading log; **every [VERIFY] reference has only been seen as an abstract or README**. Read C1, C2, C3, C5 in full before submission |
 | Abstract | Drafted last, from the checked results |
+| Reproducibility | `--rerun` on 2026-11-16 recomputed all results from the cached scores; the paper's tables and every figure came out byte-identical. If a step dies with Windows error 0xC0000142, free RAM (close Ollama) and rerun |
 | Your decisions | Venue and length limit, co-authorship with your supervisor, whether institutional review is needed, an AI-use statement if your institution or venue requires one |
 
 ## P8: the site-check demo
