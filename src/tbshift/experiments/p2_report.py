@@ -58,7 +58,7 @@ def report(run: str = "p2_densenet", n_boot: int = 2000) -> pd.DataFrame:
             auc = bootstrap_ci(auc_roc, y, z, n_boot=n_boot)
             row = {
                 "fold": fold, "mask": mask, "evaluated_on": where,
-                "n": len(y), "n_tb": int(y.sum()), "cal_tb": int(len(cal_pos)),
+                "n": len(y), "n_tb": int(y.sum()), "cal_tb": len(cal_pos),
                 "auc": auc.point, "auc_lo": auc.lower, "auc_hi": auc.upper,
             }
             for name, tau in thresholds.items():
