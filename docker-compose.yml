@@ -1,0 +1,12 @@
+services:
+  site-check:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      TBSHIFT_RUN: p2_densenet
+      TBSHIFT_FOLD: train_shenzhen__none
+    volumes:
+      # Produced locally by P2 and the multi-seed study; git-ignored.
+      - ./artifacts:/app/artifacts:ro
+      - ./results:/app/results:ro
