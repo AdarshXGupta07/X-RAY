@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P8 demo built).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P9 paper: first full draft).
 
 ## Status by phase
 
@@ -19,10 +19,23 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P8 demo built).
 | P6 Recalibration | **Done for 2 sites** | Label-free, detect-and-defer and few-label repair scored on an untouched half of the unseen site (below) |
 | P7 Degradations | **Done** | `degradations.py` (30 tests) + `experiments/p7_degradations.py`; 4 degradations × 5 severities on the held-out Shenzhen pool (below) |
 | P8 Demo | Done (Docker untested) | `site_check.py`, `backend/app/`, `frontend/`; see README "Demo" |
-| P9 Paper | Not started | |
+| P9 Paper | First full draft | `paper/paper.md`; figures and tables from `python -m tbshift.experiments.paper_assets` |
 
-Test suite today: **230 passed, 0 expected-fail, 0 errors.** Every planned research module and the demo are implemented.
+Test suite today: **233 passed, 0 expected-fail, 0 errors.** Every planned research module and the demo are implemented.
 **First real-data results exist (P2, below)**, from two public datasets and one seed. They are a research prototype's first pass, not clinical evidence.
+
+## P9: paper (first full draft)
+
+`paper/paper.md`. One command regenerates every figure (`paper/figures/`, SVG and PDF) and every table inside the paper (blocks between `<!-- table:… -->` markers): `python -m tbshift.experiments.paper_assets` (seconds, from `results/`), or with `--rerun` to recompute the results from the cached model scores first.
+
+| Item | Status |
+|---|---|
+| Limitations, Method, Results, Discussion, Conclusion | Drafted; every number checked against the CSVs on 2026-11-16 |
+| Figures | F1 pipeline (Mermaid), F2 sensitivity by seed, F3 detector power, F4 label budget, F5 degradations, S1 validity |
+| Tables | T1 datasets, T2 main per-seed results, T3 model quality and corner mask, T4 degradations |
+| Related work | Drafted from the reading log; **every [VERIFY] reference has only been seen as an abstract or README**. Read C1, C2, C3, C5 in full before submission |
+| Abstract | Drafted last, from the checked results |
+| Your decisions | Venue and length limit, co-authorship with your supervisor, whether institutional review is needed, an AI-use statement if your institution or venue requires one |
 
 ## P8: the site-check demo
 
@@ -292,6 +305,7 @@ You will be asked about this code in the viva. For each item: read the function,
 | Real-data detection and repair | `experiments/real_shift.py` | Adaptation vs evaluation split; power and false-alarm rate; why each method may only see the adaptation half | Why must the few-label images be excluded from evaluation? Why did label-free repair break sensitivity here? |
 | Degradations | `degradations.py` | Gaussian noise, Gaussian blur, JPEG compression, contrast; what each mimics in a real hospital | Why define blur strength relative to image size? |
 | Degradation study | `experiments/p7_degradations.py` | Controlled experiments; score compression; why calibrate on clean and evaluate on degraded | Explain in one minute why heavy blur did not break the certified sensitivity promise but did destroy specificity. |
+| Paper assets | `experiments/paper_assets.py` | Reproducible figures; why tables are generated, never typed; reading a violation-rate figure | Where does every number in Table 2 come from, and how would you regenerate it from scratch? |
 | Site-check verdict logic | `site_check.py` | Turning statistics into a decision rule; one-sided binomial test; why labels outrank a detector | A site sends 15 labelled TB cases and 4 are missed. Why is that already evidence, before you have 22? |
 | Demo API | `backend/app/` | FastAPI lifespan (load the model once), Pydantic schemas, thin routers, dependency on `app.state`, TestClient with a fake scorer | Why load the model at startup, not per request? How do the API tests run without the model or any patient data? |
 | Multi-seed aggregation | `experiments/multi_seed.py` | Training randomness; mean and standard deviation across runs; paired comparisons | Why did one seed break the promise when four did not, and why could you not tell from the source data? |

@@ -15,7 +15,7 @@ A chest X-ray model is tuned at some hospitals to catch at least ~90% of TB case
 
 ## Status
 
-Experiments are complete for two sites and five training seeds; the demo is built; the paper is next. See [docs/PROGRESS.md](docs/PROGRESS.md) for results and [docs/PLAN.md](docs/PLAN.md) for the roadmap.
+Experiments are complete for two sites and five training seeds; the demo is built; the paper draft is in [paper/paper.md](paper/paper.md) (regenerate its figures and tables with `python -m tbshift.experiments.paper_assets`). See [docs/PROGRESS.md](docs/PROGRESS.md) for results and [docs/PLAN.md](docs/PLAN.md) for the roadmap.
 
 ## Setup (Windows, Anaconda Python 3.13)
 

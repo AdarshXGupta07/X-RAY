@@ -294,3 +294,17 @@ Distribution check (all 100 clean TB cases): certified threshold −4.87. TB sco
 3. With only about 30 TB labels the re-certified threshold restores sensitivity but clears almost no healthy people. The demo shows this cost instead of hiding it.
 
 **Next.** P9: paper and report.
+
+---
+
+## 2026-11-16 — P9 paper, first draft
+
+**What was done.** `experiments/paper_assets.py` builds every figure and fills every table in `paper/paper.md` from the result CSVs, so numbers cannot drift. Drafted the paper in the plan's order: limitations first, abstract last. Each number in the prose was checked against the CSVs.
+
+**Corrections found while checking.**
+
+- P7: the certified violation reaches 0.101 (contrast, severity 3), so the claim is now "at most 0.101, within the budget up to evaluation noise", not "≤ 0.10".
+- The domain-classifier AUC (1.000 vs 0.52) comes from the seed-0 run only; the paper now says so.
+- Montgomery-trained fine-tuned models transfer worse than the frozen-feature baseline (0.779 vs 0.847). Added to the paper as a small-data overfitting note.
+
+**Open.** Literature verification (all [VERIFY] entries), venue, authorship, a second pass for length once the venue is known.
