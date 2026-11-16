@@ -24,8 +24,10 @@ the burned-in "R" markers would be mirrored, creating images that never occur.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 from PIL import Image
@@ -101,6 +103,7 @@ class CXRDataset(Dataset):
         image_size: int = 224,
         train: bool = False,
         corner_mask: tuple[float, float] | None = None,
+        image_fn: Callable[[np.ndarray, int], np.ndarray] | None = None,
     ):
         if path_column not in frame.columns:
             raise ValueError(f"frame has no {path_column!r} column; run the preprocess step first")
@@ -108,11 +111,18 @@ class CXRDataset(Dataset):
         self.labels = torch.tensor(frame["label"].to_numpy(), dtype=torch.float32)
         self.image_ids = frame["image_id"].tolist() if "image_id" in frame else None
         self.transform = build_transform(image_size, train, corner_mask)
+        # Optional hook used by phase P7: receives the gray image as float32 in
+        # [0, 1] plus the item index (for a per-image noise seed) and returns
+        # the degraded image. Applied before resizing and normalisation.
+        self.image_fn = image_fn
 
     def __len__(self) -> int:
         return len(self.paths)
 
     def __getitem__(self, i: int) -> tuple[torch.Tensor, torch.Tensor]:
         with Image.open(self.paths[i]) as img:
-            image = self.transform(img.convert("L"))
-        return image, self.labels[i]
+            gray = img.convert("L")
+        if self.image_fn is not None:
+            a = self.image_fn(np.asarray(gray, dtype=np.float32) / 255.0, i)
+            gray = Image.fromarray(np.round(np.clip(a, 0.0, 1.0) * 255).astype(np.uint8))
+        return self.transform(gray), self.labels[i]

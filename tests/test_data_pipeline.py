@@ -196,3 +196,17 @@ def test_dataset_with_corner_mask(cached_frame):
 def test_corner_mask_rejects_bad_fractions():
     with pytest.raises(ValueError):
         CornerMask(0.6, 0.1)
+
+
+def test_image_fn_is_applied_per_item(cached_frame):
+    root, frame = cached_frame
+    seen = []
+
+    def blackout(a, i):
+        seen.append(i)
+        return np.zeros_like(a)
+
+    ds = CXRDataset(frame, root=root, image_size=32, image_fn=blackout)
+    x, _ = ds[2]
+    raw = x * torch.tensor(IMAGENET_STD).view(3, 1, 1) + torch.tensor(IMAGENET_MEAN).view(3, 1, 1)
+    assert seen == [2] and raw.abs().max() < 1e-5
