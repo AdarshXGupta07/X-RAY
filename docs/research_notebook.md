@@ -174,3 +174,28 @@ Other Shenzhen facts: 26 of 27 RGB-format files are TB (all are gray in content,
 **Caveats.** One seed. Montgomery's validation split has 14 images, and its validation AUC reached 1.000, so early stopping there is close to arbitrary. Test splits are small (Montgomery 20, Shenzhen 99). Intervals are wide.
 
 **Next.** P4: repeat the calibration/test split many times on the cached scores (cheap), add temperature scaling, and measure violation rate and specificity per direction. Run 3–5 seeds of P2 for the mask comparison when time allows.
+
+---
+
+## 2026-11-16 — P4: leave-one-site-out on the score cache
+
+**Question (RQ1).** When a threshold calibrated at one hospital is used at the other, how often does the 90% sensitivity promise fail, and what else changes?
+
+**What was done.** `experiments/loso.py`. For each P2 model: 1,000 draws; each draw splits the source site's held-out pool (cal + test splits) into a class-stratified calibration half and a control half; fits temperature on the calibration half; sets fixed (logit ≥ 0), marginal and certified thresholds (α = δ = 0.10); measures sensitivity and specificity on the control half and on every image of the unseen site. Seed 0. About 20 seconds on CPU.
+
+**Result.** Tables in PROGRESS.md. Trained on Shenzhen, no mask:
+
+- Control: marginal mean sensitivity 0.903, violation 35.8%; certified 0.962, violation 6.6%.
+- Montgomery: certified sensitivity 0.997, violation 0%, specificity 0.053 (control 0.467). Marginal 0.949 / 8.1% / 0.362. Fixed threshold 0.759 / 100% / 0.825.
+- Trained on Montgomery: 8 calibration TB cases per draw; both conformal thresholds trivial in every draw.
+
+**Conclusion.**
+
+1. The pipeline behaves correctly on real data: the in-distribution control reproduces the simulation (certified ≤ δ; marginal ≈ 35–45%).
+2. For this pair of sites the shift raises scores. The certified promise survives at Montgomery, but specificity collapses from 0.47 to 0.05. The honest RQ1 finding so far is "silent loss of usefulness", not "silent loss of safety".
+3. The naive P ≥ 0.5 threshold is the one that silently fails on sensitivity.
+4. Two sites cannot answer RQ1 in general. Priorities: more sites (DA/DB, TBX11K, Mendeley after inspection) and P7 degradations, which can create harmful shifts on purpose.
+
+**Caveats.** One model seed per fold; the target set is fixed (138 Montgomery images, 58 TB), so its own sampling noise is not in the violation rate; temperature scaling is fitted per draw on about 100 images.
+
+**Next.** P5/P6 on real scores: does the KS detector fire for Shenzhen → Montgomery, and do label-free and few-label recalibration restore specificity without breaking sensitivity?

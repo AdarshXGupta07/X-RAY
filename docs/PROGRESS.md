@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P2 model, shortcut checks and score cache added).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P4 leave-one-site-out added).
 
 ## Status by phase
 
@@ -14,15 +14,40 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P2 model, shortcut checks
 | P1 Data | **Done for 2 sites** | Manifests, stratified patient-level splits, 512 px cache and `CXRDataset` (37 tests). Both sites split and cached. EDA notebook not written |
 | P2 Model + score cache | **Done (first pass)** | DenseNet-121, frozen baseline + fine-tuning per fold, with and without corner mask; score cache verified against manifests; shortcut checks |
 | P3 Calibration + conformal | **Done** | `calibration.py`, `conformal.py`, 41 passing tests; validity simulation run (below) |
-| P4 Leave-one-site-out | Not started | |
+| P4 Leave-one-site-out | **Done for 2 sites** | `experiments/loso.py`, 5 tests; 1,000 calibration draws per model; results below |
 | P5 Shift detection | **Done on synthetic data** | `shift.py`, 14 passing tests; real-data run waits for P2 |
 | P6 Recalibration | **Done on synthetic data** | `recalibration.py`, 13 passing tests; synthetic comparison of all methods (below) |
 | P7 Degradations | Specified, not written | 27 tests waiting |
 | P8 Demo | Not started | Folders only |
 | P9 Paper | Not started | |
 
-Test suite today: **157 passed, 27 expected-fail, 0 errors.**
+Test suite today: **162 passed, 27 expected-fail, 0 errors.**
 **First real-data results exist (P2, below)**, from two public datasets and one seed. They are a research prototype's first pass, not clinical evidence.
+
+## P4: does the 90% promise survive the other hospital? (two sites)
+
+`python -m tbshift.experiments.loso --repeats 1000`: about 20 seconds on CPU. Each draw takes a fresh, class-stratified half of the source site's held-out images for calibration and uses the other half as the in-distribution control. Violation = measured sensitivity below 90%.
+
+**Trained on Shenzhen, no corner mask** (50 calibration TB cases per draw):
+
+| Threshold | Shenzhen (control): sens. / violation / spec. | Montgomery (unseen): sens. / violation / spec. |
+|---|---|---|
+| Fixed, P(TB) ≥ 0.5 | 0.81 / 98% / 0.96 | 0.76 / **100%** / 0.83 |
+| Marginal conformal | 0.90 / 36% / 0.79 | 0.95 / 8% / 0.36 |
+| Certified (δ = 0.10) | 0.96 / **6.6%** / 0.47 | 1.00 / 0% / **0.05** |
+
+With the corner mask the pattern is the same (certified: control violation 6.3%, specificity 0.65 → 0.08 at Montgomery).
+
+**Trained on Montgomery:** the calibration half holds 8 TB cases, below the marginal floor (9) and the certified floor (22). Both conformal thresholds flag everyone in 100% of draws.
+
+**Temperature scaling** (median T 1.2–2.2) barely changed calibration error at the source and did not fix it at the unseen site (ECE at Montgomery 0.08–0.29 depending on mask).
+
+What it shows:
+
+1. **The control passes.** At the home site the certified threshold violates in 6–7% of draws, inside its 10% budget; the marginal threshold violates in 36–38%, as the theory and simulation predicted.
+2. **In the one direction that can be certified, the sensitivity promise did not fail; usefulness did.** Montgomery's scores sit higher, so TB cases are still caught, but the certified threshold clears only 5–8% of healthy people (vs 47–65% at home). Nothing in the source data warns of this.
+3. **A default threshold fails silently on sensitivity:** P(TB) ≥ 0.5 catches 76% of TB at Montgomery, every time.
+4. **With only two sites, RQ1 cannot yet show a sensitivity failure of the certified threshold.** Harmful shifts need more sites (candidates in the dataset audit) or the controlled degradations of P7.
 
 ## P2: first real-data results (two sites, seed 0)
 
@@ -156,6 +181,7 @@ You will be asked about this code in the viva. For each item: read the function,
 | Training loop | `training/train.py` | Forward, loss, backward, step; BCE with logits; AdamW; mixed precision; early stopping | Why restore the best-validation weights? Why is early stopping on 14 validation images unreliable? |
 | Shortcut checks | `experiments/shortcut_checks.py` | Shortcut learning; positive and negative controls; cross-validation | Why is a corner that beats the lung fields a red flag? |
 | P2 runner and report | `experiments/p2_models.py`, `p2_report.py` | Leave-one-site-out; frozen vs fine-tuned features; score caching | Why did fine-tuning help when trained on Shenzhen but hurt when trained on Montgomery? |
+| Leave-one-site-out study | `experiments/loso.py` | Repeated random calibration splits; in-distribution controls; violation rate vs mean sensitivity | Why does the control matter more than the headline number? Why can Montgomery never be the calibration source here? |
 | Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
 
