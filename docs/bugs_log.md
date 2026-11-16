@@ -68,3 +68,11 @@ Template: **Date · Symptom · Cause · How it was found · Fix · How to catch 
 - **How it was found.** Listing the process's loaded files with `psutil.Process().memory_maps()` and filtering for `iomp5`.
 - **Fix.** Renamed `torch\lib\libiomp5md.dll` to `.bak`. PyTorch then loads Anaconda's copy from `anaconda3\Library\bin`, so exactly one runtime is loaded in either import order. Training also uses `num_workers=0`. The `KMP_DUPLICATE_LIB_OK=TRUE` workaround was rejected: Intel warns it can silently give wrong results.
 - **Next time.** When mixing conda and pip, count loaded copies of shared runtimes instead of assuming. "It didn't crash" does not mean only one copy is loaded.
+
+## 2026-11-16 — CPU-only tests failing with "CUDA error: out of memory"
+
+- **Symptom.** `test_training.py` failed now and then with `torch.AcceleratorError: CUDA error: out of memory`, although every test trains on the CPU. Hiding the GPU with `CUDA_VISIBLE_DEVICES=""` made it worse: an occasional hard crash (`Windows fatal exception: code 0xc0000374`) at the same line.
+- **Cause.** AdamW's `step()` runs `_accelerator_graph_capture_health_check`, which asks the GPU for its current stream whenever PyTorch was built with CUDA. That opens a CUDA context. The 4 GB card is shared with Ollama and the browser, so sometimes there was no room for it.
+- **How it was found.** The traceback pointed into `torch/optim/optimizer.py`; reading that function showed it runs regardless of the training device. Repeating the suite several times exposed the intermittency.
+- **Fix.** `tests/conftest.py` switches that health check off for the test session only (it only matters for CUDA-graph capture, which no test uses). Six full runs in a row passed. Real training is unchanged.
+- **Next time.** A failure that comes and goes usually depends on something outside the test (shared GPU, memory, timing). Run the suite several times before and after a fix, and keep unit tests independent of the GPU.
