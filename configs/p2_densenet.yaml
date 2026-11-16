@@ -1,0 +1,27 @@
+# Phase P2: one fixed DenseNet-121, trained once per leave-one-site-out fold.
+# Every run folder stores a copy of this file, the seed and the Git commit.
+
+run_name: p2_densenet
+seed: 0
+sites: [montgomery, shenzhen]
+
+image_size: 224
+batch_size: 16
+num_workers: 0          # see tests/test_data_pipeline.py::test_dataset_is_picklable
+
+# Corner-mask settings to compare. null = no mask; [width, height] fractions.
+corner_masks:
+  none: null
+  corners: [0.25, 0.12]
+
+frozen_baseline:
+  C_grid: [0.001, 0.01, 0.1, 1.0]   # chosen on the source validation split
+
+fine_tune:
+  head_epochs: 2        # warm up the new head with the backbone frozen
+  head_lr: 1.0e-3
+  epochs: 25
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  patience: 5
+  amp: true
