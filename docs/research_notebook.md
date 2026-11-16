@@ -199,3 +199,28 @@ Other Shenzhen facts: 26 of 27 RGB-format files are TB (all are gray in content,
 **Caveats.** One model seed per fold; the target set is fixed (138 Montgomery images, 58 TB), so its own sampling noise is not in the violation rate; temperature scaling is fitted per draw on about 100 images.
 
 **Next.** P5/P6 on real scores: does the KS detector fire for Shenzhen → Montgomery, and do label-free and few-label recalibration restore specificity without breaking sensitivity?
+
+---
+
+## 2026-11-16 — P5 and P6 on real data
+
+**Question.** RQ2: can the Shenzhen → Montgomery shift be detected without labels? RQ3: which repair restores a useful threshold without breaking the 90% sensitivity promise, and how many labels does it take?
+
+**What was done.** `experiments/real_shift.py`, 1,000 repeats per P2 model, seed 0. Source: certified threshold from a calibration half of the held-out pool; the other half is an unlabelled reference. Target: stratified split into adaptation and evaluation halves; methods only touch the adaptation half; all are scored on the evaluation half. KS detector at batch sizes 10–69 (Montgomery) or 10–331 (Shenzhen) with false alarms from source batches; domain classifier on embeddings.
+
+**Result** (Shenzhen → Montgomery, no mask; full tables in PROGRESS.md and `results/p5p6_real/`):
+
+- KS power 0.10 / 0.58 / 0.99 / 1.00 at batch 10 / 20 / 50 / 69; false alarms 1.5–3.8%. Domain AUC 1.000 vs 0.52 null.
+- Violation / specificity: source certified 1% / 0.05; label-free 27% / 0.42; detect-defer 0% / 0.00; few-label certified 69 labels 11% / 0.36; 50 labels 7% / 0.16 with 59% trivial.
+- With the corner mask, label-free violates 71%.
+- Montgomery → Shenzhen: source thresholds trivial; few-label certified at 100 labels 9% / 0.09.
+
+**Conclusion.**
+
+1. Detection is the easy part: 50 unlabelled images. Deciding what to do about it is not, because "different" was not "unsafe" here.
+2. Label-free repair is not safe for a sensitivity promise when TB prevalence differs between sites.
+3. Few-label re-certification is the only repair that kept the promise and restored usefulness, and its cost is set by TB-positive labels: about 29 here, consistent with the derived floor of 22.
+
+**Caveats.** Two sites, one model seed; evaluation halves are small (69 Montgomery images, 29 TB), which inflates measured violation slightly; the domain classifier reaches 1.000 so easily that it says little beyond "these are different hospitals".
+
+**Next.** P7 degradations to create shifts that do hurt sensitivity; more sites from the audit; several P2 seeds for the corner-mask question.

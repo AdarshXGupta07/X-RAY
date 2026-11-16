@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P4 leave-one-site-out added).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P5 and P6 on real data added).
 
 ## Status by phase
 
@@ -15,14 +15,49 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P4 leave-one-site-out add
 | P2 Model + score cache | **Done (first pass)** | DenseNet-121, frozen baseline + fine-tuning per fold, with and without corner mask; score cache verified against manifests; shortcut checks |
 | P3 Calibration + conformal | **Done** | `calibration.py`, `conformal.py`, 41 passing tests; validity simulation run (below) |
 | P4 Leave-one-site-out | **Done for 2 sites** | `experiments/loso.py`, 5 tests; 1,000 calibration draws per model; results below |
-| P5 Shift detection | **Done on synthetic data** | `shift.py`, 14 passing tests; real-data run waits for P2 |
-| P6 Recalibration | **Done on synthetic data** | `recalibration.py`, 13 passing tests; synthetic comparison of all methods (below) |
+| P5 Shift detection | **Done for 2 sites** | `shift.py` + `experiments/real_shift.py`; KS power and false alarms by batch size; embedding domain classifier |
+| P6 Recalibration | **Done for 2 sites** | Label-free, detect-and-defer and few-label repair scored on an untouched half of the unseen site (below) |
 | P7 Degradations | Specified, not written | 27 tests waiting |
 | P8 Demo | Not started | Folders only |
 | P9 Paper | Not started | |
 
-Test suite today: **162 passed, 27 expected-fail, 0 errors.**
+Test suite today: **167 passed, 27 expected-fail, 0 errors.**
 **First real-data results exist (P2, below)**, from two public datasets and one seed. They are a research prototype's first pass, not clinical evidence.
+
+## P5 and P6 on real data: can the shift be seen, and can it be repaired? (two sites)
+
+`python -m tbshift.experiments.real_shift --repeats 1000`: about 35 seconds on CPU. Each repeat splits the unseen site, stratified by class, into an adaptation half (the only place methods may look) and an evaluation half (where every method is scored).
+
+**Detection, trained on Shenzhen → Montgomery, no mask** (KS test on scores):
+
+| Unlabelled batch | 10 | 20 | 50 | 69 |
+|---|---|---|---|---|
+| Fires on Montgomery batch (power) | 0.10 | 0.58 | 0.99 | 1.00 |
+| Fires on Shenzhen batch (false alarm) | 0.04 | 0.03 | 0.02 | 0.02 |
+
+Embedding domain classifier: source vs Montgomery AUC 1.000; source vs source 0.52.
+
+**Repair, trained on Shenzhen → Montgomery, no mask** (scored on the untouched evaluation half; violation = sensitivity below 90%):
+
+| Method | Violation | Mean sensitivity | Specificity | Flags everyone |
+|---|---|---|---|---|
+| Source certified (no repair) | 1% | 1.00 | 0.05 | 0% |
+| Label-free (quantile matching) | **27%** | 0.95 | 0.42 | 0% |
+| Detect and defer | 0% | 1.00 | 0.00 | 100% |
+| Few-label marginal, 69 labels | 52% | 0.90 | 0.55 | 0% |
+| Few-label certified, 50 labels (≈21 TB) | 7% | 0.98 | 0.16 | 59% |
+| **Few-label certified, 69 labels (29 TB)** | **11%** | 0.97 | **0.36** | 0% |
+
+With the corner mask: label-free violates in 71% of repeats; few-label certified at 69 labels 13%, specificity 0.15.
+
+**Trained on Montgomery → Shenzhen:** every source-based method flags everyone. Few-label certified on Shenzhen labels: 100 labels (≈51 TB) give 9% violation but specificity only 0.09, because this model is weak (AUC 0.71).
+
+What it shows:
+
+1. **RQ2: the shift is easy to see and the detector cannot tell what it means.** 50 unlabelled images are enough, but the shift here hurt specificity, not sensitivity, so a detector-triggered deferral throws away all automation for a problem that was not a safety problem.
+2. **RQ3: label-free repair trades safety for usefulness.** It recovers specificity (0.05 → 0.42) but breaks the sensitivity promise in 27–71% of repeats. Montgomery has fewer TB cases (42%) than Shenzhen (51%), which is the prevalence trap the synthetic study predicted.
+3. **RQ3: about 29 TB-positive labels from the new site re-certify the threshold** with specificity 0.36 instead of 0.05. With about 21 TB cases (50 labels) the certified threshold usually cannot be computed at all, as the label floor of 22 predicts.
+4. Measured violation rates include sampling noise from the 69-image evaluation half, so values a little above 10% (11–17%) for certified thresholds are expected.
 
 ## P4: does the 90% promise survive the other hospital? (two sites)
 
@@ -182,6 +217,7 @@ You will be asked about this code in the viva. For each item: read the function,
 | Shortcut checks | `experiments/shortcut_checks.py` | Shortcut learning; positive and negative controls; cross-validation | Why is a corner that beats the lung fields a red flag? |
 | P2 runner and report | `experiments/p2_models.py`, `p2_report.py` | Leave-one-site-out; frozen vs fine-tuned features; score caching | Why did fine-tuning help when trained on Shenzhen but hurt when trained on Montgomery? |
 | Leave-one-site-out study | `experiments/loso.py` | Repeated random calibration splits; in-distribution controls; violation rate vs mean sensitivity | Why does the control matter more than the headline number? Why can Montgomery never be the calibration source here? |
+| Real-data detection and repair | `experiments/real_shift.py` | Adaptation vs evaluation split; power and false-alarm rate; why each method may only see the adaptation half | Why must the few-label images be excluded from evaluation? Why did label-free repair break sensitivity here? |
 | Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
 
