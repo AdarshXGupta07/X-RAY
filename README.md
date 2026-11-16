@@ -15,7 +15,7 @@ A chest X-ray model is tuned at some hospitals to catch at least ~90% of TB case
 
 ## Status
 
-Work in progress. See [docs/PROGRESS.md](docs/PROGRESS.md) for what is done and [docs/PLAN.md](docs/PLAN.md) for the roadmap. No experimental results exist yet.
+Experiments are complete for two sites and five training seeds; the demo is built; the paper is next. See [docs/PROGRESS.md](docs/PROGRESS.md) for results and [docs/PLAN.md](docs/PLAN.md) for the roadmap.
 
 ## Setup (Windows, Anaconda Python 3.13)
 
@@ -48,18 +48,52 @@ pytest
 On a machine without Smart App Control, the plain route also works:
 `pip install torch torchvision --index-url ...` followed by `pip install -e ".[dev]"`.
 
+## Demo: site check
+
+A small web app that answers one question for a new hospital: *can we trust the
+rule-out threshold certified elsewhere?* It compares the site's model scores with
+the source (KS test), checks any labelled TB cases, and re-certifies the threshold
+when at least 22 TB cases are labelled. It also shows the five-seed results and
+the limitations. Research prototype; not for clinical use.
+
+```powershell
+# once: web packages (pure Python) and the frontend build
+pip install fastapi uvicorn python-multipart
+cd frontend; npm install; npm run build; cd ..
+
+# run (needs the P2 checkpoint and score cache in artifacts/)
+uvicorn backend.app.main:app --port 8000
+```
+
+Open http://localhost:8000 (app) or http://localhost:8000/docs (API).
+**Simulated hospital** needs no images: it resamples the source model's scores,
+shifts them, and shows the true answer next to the check's verdict.
+**Upload images** scores your own PNG/JPEG X-rays in memory (nothing is stored);
+an optional `filename,label` CSV adds labels. No NLM images are shipped or shown.
+
+Frontend development with hot reload: run the API as above, then `cd frontend; npm run dev`
+and open http://localhost:5173 (it forwards `/api` to port 8000).
+
+Docker: `docker compose up --build` builds one image (CPU PyTorch, FastAPI serving
+the built React app) and mounts `artifacts/` and `results/` read-only, since the
+model derives from NLM data and is not baked into the image.
+
+Smart App Control note: Rollup's native binary is blocked on this machine, so
+`frontend/package.json` overrides it with `@rollup/wasm-node` (same bundler,
+WebAssembly build).
+
 ## Layout
 
 | Path | Contents |
 |---|---|
 | `src/tbshift/` | Research code: metrics, calibration, conformal thresholds, shift detection, recalibration, degradations |
-| `tests/` | Unit tests. Tests for unwritten modules are marked `xfail` and act as the specification |
+| `tests/` | Unit tests (research code and demo API) |
 | `configs/` | YAML experiment configs |
 | `data/manifests/` | CSV manifests (paths, labels, site). Images are never committed |
 | `artifacts/` | Cached model scores and checkpoints (git-ignored) |
 | `results/` | Experiment CSVs and figures (git-ignored) |
-| `backend/app/` | FastAPI "site check" service |
-| `frontend/src/` | React + Vite demo |
+| `backend/app/` | FastAPI "site check" service: routers (thin), schemas (Pydantic), services (model, scenarios, results) |
+| `frontend/src/` | React + Vite demo: Site check, Study results, Limitations pages |
 | `docs/` | Plan, progress, research notebook, bug log, reading log, dataset audit |
 
 ## Data

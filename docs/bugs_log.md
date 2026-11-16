@@ -84,3 +84,11 @@ Template: **Date · Symptom · Cause · How it was found · Fix · How to catch 
 - **How it was found.** `Get-CimInstance Win32_OperatingSystem` (free physical and virtual memory) and the process list sorted by memory.
 - **Fix.** Ran one training process at a time, with nothing else heavy alongside, and a retry. The runner now saves its summary after every model, so a crash loses only the model in progress. Seeds reproduced exactly on rerun (same AUCs), confirming the seeding.
 - **Next time.** Before long GPU jobs, check free commit memory, not just GPU memory, and close other large programs (Ollama). Save progress incrementally in any long job.
+
+## 2026-11-16 — Vite build blocked: Rollup's native binary
+
+- **Symptom.** `import('rollup')` failed with `An Application Control policy has blocked this file ... rollup.win32-x64-msvc.node`. esbuild's native binary loaded fine.
+- **Cause.** Smart App Control again: an unsigned native Node add-on with little reputation.
+- **How it was found.** Loading esbuild and Rollup on their own right after `npm install`, before writing any frontend code.
+- **Fix.** `"overrides": {"rollup": "npm:@rollup/wasm-node@4.27.4"}` in `frontend/package.json`: the same bundler compiled to WebAssembly, so no native file is loaded. Builds take about 1.5 s. Security settings were not changed.
+- **Next time.** On this machine, test every new toolchain's native parts with a one-line import before building on it.

@@ -276,3 +276,21 @@ Distribution check (all 100 clean TB cases): certified threshold −4.87. TB sco
 **Caveats.** Five seeds is still few; Montgomery is small (58 TB, 29 in each evaluation half), so per-seed violation estimates carry their own noise; one architecture.
 
 **Next.** Experiments are frozen per the plan. Next: demo (P8) and paper (P9). Use the multi-seed tables as the main results.
+
+---
+
+## 2026-11-16 — P8 site-check demo
+
+**Question.** Can the study's findings be turned into a usable decision rule for a new hospital?
+
+**What was done.** `tbshift/site_check.py` holds the rule (no web code): defer below 20 images; re-certify when at least 22 TB cases are labelled; otherwise "re-certify before use" if a one-sided binomial test on the labelled TB cases rejects 90% sensitivity or the KS test sees a score shift; otherwise "plausible". FastAPI backend (model loaded once at startup, CPU), React frontend (Site check, Study results, Limitations), simulated scenarios with known ground truth so no patient images are needed.
+
+**Result.** See PROGRESS.md (P8). Real Montgomery upload of 30 images: no shift detected (p = 0.052), consistent with P5/P6 power at this batch size. Simulated harmful shift: the check says "re-certify" every time, and the ground-truth panel shows the source threshold catching about 65% of TB.
+
+**Conclusion.**
+
+1. The rule never recommends the label-free threshold move, because the multi-seed study showed it is unsafe.
+2. "Shift detected" is worded as "promise unverified", not "promise broken": the detector fired for all five seeds, but only one failed.
+3. With only about 30 TB labels the re-certified threshold restores sensitivity but clears almost no healthy people. The demo shows this cost instead of hiding it.
+
+**Next.** P9: paper and report.

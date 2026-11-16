@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (five training seeds added; this changes the RQ1 conclusion).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P8 demo built).
 
 ## Status by phase
 
@@ -18,11 +18,32 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (five training seeds added
 | P5 Shift detection | **Done for 2 sites** | `shift.py` + `experiments/real_shift.py`; KS power and false alarms by batch size; embedding domain classifier |
 | P6 Recalibration | **Done for 2 sites** | Label-free, detect-and-defer and few-label repair scored on an untouched half of the unseen site (below) |
 | P7 Degradations | **Done** | `degradations.py` (30 tests) + `experiments/p7_degradations.py`; 4 degradations × 5 severities on the held-out Shenzhen pool (below) |
-| P8 Demo | Not started | Folders only |
+| P8 Demo | Done (Docker untested) | `site_check.py`, `backend/app/`, `frontend/`; see README "Demo" |
 | P9 Paper | Not started | |
 
-Test suite today: **206 passed, 0 expected-fail, 0 errors.** Every planned research module is now implemented.
+Test suite today: **230 passed, 0 expected-fail, 0 errors.** Every planned research module and the demo are implemented.
 **First real-data results exist (P2, below)**, from two public datasets and one seed. They are a research prototype's first pass, not clinical evidence.
+
+## P8: the site-check demo
+
+**What it does.** One page answers "can this hospital trust the threshold certified at Shenzhen?" Verdicts, in order:
+
+| Verdict | When |
+|---|---|
+| Not enough data (`defer`) | fewer than 20 images |
+| Re-certified (`recertified`) | at least 22 labelled TB cases: certify a new threshold from them (labels beat the detector) |
+| Re-certify before use (`recalibrate`) | the labelled TB cases already show too many misses (one-sided binomial test), or the KS test sees a score shift |
+| Promise plausible (`plausible`) | none of the above; "plausible, not proven" |
+
+The label-free threshold move is deliberately not offered as a fix: it broke the promise in 27–80% of draws in the multi-seed study.
+
+**Checked by hand (2026-11-16):**
+
+- Real model (`p2_densenet/train_shenzhen__none`), CPU. 30 full-size Montgomery originals (15 TB) uploaded: 14 s; server logits match the P2 cache within 0.11 (CPU float32 vs GPU half precision). Verdict "plausible": KS p = 0.052 at 30 images, just above the 5% line, and none of the 15 labelled TB cases missed. Consistent with P5/P6 (power grows quickly between 20 and 50 images).
+- Simulated scenarios over 40 draws each: *similar* → plausible 40/40; *scores drift upward* → recalibrate 40/40 (true sensitivity 1.00); *TB cases look milder* (−1.6 sd) → recalibrate 40/40, true sensitivity of the source threshold 0.65 on average (max 0.83); with 30 TB labels → recertified 40/40, true sensitivity 0.98, but almost no healthy people cleared (the specificity cost of few labels).
+- Headless browser: no console errors, no failed requests, no horizontal scroll at 390 px.
+
+**Not checked:** `docker compose up` (Docker Desktop was not running; starting it would compete for the RAM that crashed the seed runs).
 
 ## Five training seeds: the headline result (read this first)
 
@@ -271,6 +292,8 @@ You will be asked about this code in the viva. For each item: read the function,
 | Real-data detection and repair | `experiments/real_shift.py` | Adaptation vs evaluation split; power and false-alarm rate; why each method may only see the adaptation half | Why must the few-label images be excluded from evaluation? Why did label-free repair break sensitivity here? |
 | Degradations | `degradations.py` | Gaussian noise, Gaussian blur, JPEG compression, contrast; what each mimics in a real hospital | Why define blur strength relative to image size? |
 | Degradation study | `experiments/p7_degradations.py` | Controlled experiments; score compression; why calibrate on clean and evaluate on degraded | Explain in one minute why heavy blur did not break the certified sensitivity promise but did destroy specificity. |
+| Site-check verdict logic | `site_check.py` | Turning statistics into a decision rule; one-sided binomial test; why labels outrank a detector | A site sends 15 labelled TB cases and 4 are missed. Why is that already evidence, before you have 22? |
+| Demo API | `backend/app/` | FastAPI lifespan (load the model once), Pydantic schemas, thin routers, dependency on `app.state`, TestClient with a fake scorer | Why load the model at startup, not per request? How do the API tests run without the model or any patient data? |
 | Multi-seed aggregation | `experiments/multi_seed.py` | Training randomness; mean and standard deviation across runs; paired comparisons | Why did one seed break the promise when four did not, and why could you not tell from the source data? |
 | Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
