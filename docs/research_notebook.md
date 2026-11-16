@@ -224,3 +224,26 @@ Other Shenzhen facts: 26 of 27 RGB-format files are TB (all are gray in content,
 **Caveats.** Two sites, one model seed; evaluation halves are small (69 Montgomery images, 29 TB), which inflates measured violation slightly; the domain classifier reaches 1.000 so easily that it says little beyond "these are different hospitals".
 
 **Next.** P7 degradations to create shifts that do hurt sensitivity; more sites from the audit; several P2 seeds for the corner-mask question.
+
+---
+
+## 2026-11-16 — P7: controlled degradations
+
+**Question.** If a shift is made on purpose (noise, blur, JPEG, contrast at 5 severities), does the source certified threshold break, does the detector notice, and do the repairs work?
+
+**What was done.** Implemented `degradations.py` (per-image seeds; blur defined at 224 px and scaled up). `p7_degradations.py score` ran the P2 Shenzhen model (no mask) on the 198-image held-out Shenzhen pool under 21 conditions (clean check: max difference 0.004 logits from the P2 cache). `analyze`: 1,000 repeats per condition; calibrate on a clean stratified half; split the degraded other half into adaptation and evaluation quarters (about 25 TB each).
+
+**Result.** Tables in PROGRESS.md. Certified violation ≤ 0.10 in every condition; certified specificity 0.48 (clean) → 0.00 (blur 5, noise 3–5). Label-free violation up to 0.65 (blur 5). Few-label certified 0.10–0.14 everywhere. KS detection: blur 4–5 and noise 2–5 ≈ 1.00; contrast 4 = 0.11.
+
+Distribution check (all 100 clean TB cases): certified threshold −4.87. TB score 5th percentile / median / spread: clean −4.89 / +3.62 / 4.28; blur 5 −2.55 / −0.73 / 1.36. Normal median −5.78 → −1.46.
+
+**Conclusion.**
+
+1. For this model, image degradation makes predictions less confident rather than confidently wrong. A low, certified rule-out threshold is robust to that on sensitivity and pays in specificity.
+2. This sharpens RQ1's answer from P4: the silent failure we can actually demonstrate on public data is loss of usefulness, not loss of safety. The paper should say this plainly and show the synthetic "harmful shift" as the case that would break safety.
+3. Label-free quantile matching has a second failure mode besides prevalence: shifts that move the two classes differently.
+4. The "detect, then re-certify with about 25 labelled TB cases" combination worked in every condition. That is the practical recommendation the data supports so far.
+
+**Caveats.** One model, one seed; evaluation quarters have about 25 TB cases, so violation estimates carry roughly ±0.03 of their own noise; degradations are simulated.
+
+**Next.** Experiments for the core questions are now complete for two sites. Remaining: more P2 seeds (corner mask question), more sites if possible, then the demo (P8) and the paper (P9). Per the plan, freeze experiment design here; new ideas go to "future work".

@@ -1,7 +1,7 @@
 # Progress
 
 What is done, what is not, and what to study to understand the finished parts.
-Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P5 and P6 on real data added).
+Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P7 degradations added).
 
 ## Status by phase
 
@@ -17,12 +17,39 @@ Roadmap: [PLAN.md](PLAN.md). Last updated: 2026-11-16 (P5 and P6 on real data ad
 | P4 Leave-one-site-out | **Done for 2 sites** | `experiments/loso.py`, 5 tests; 1,000 calibration draws per model; results below |
 | P5 Shift detection | **Done for 2 sites** | `shift.py` + `experiments/real_shift.py`; KS power and false alarms by batch size; embedding domain classifier |
 | P6 Recalibration | **Done for 2 sites** | Label-free, detect-and-defer and few-label repair scored on an untouched half of the unseen site (below) |
-| P7 Degradations | Specified, not written | 27 tests waiting |
+| P7 Degradations | **Done** | `degradations.py` (30 tests) + `experiments/p7_degradations.py`; 4 degradations × 5 severities on the held-out Shenzhen pool (below) |
 | P8 Demo | Not started | Folders only |
 | P9 Paper | Not started | |
 
-Test suite today: **167 passed, 27 expected-fail, 0 errors.**
+Test suite today: **202 passed, 0 expected-fail, 0 errors.** Every planned research module is now implemented.
 **First real-data results exist (P2, below)**, from two public datasets and one seed. They are a research prototype's first pass, not clinical evidence.
+
+## P7: controlled shifts by degrading images (Shenzhen model, held-out Shenzhen pool)
+
+`python -m tbshift.experiments.p7_degradations score` (GPU, about 1 minute) then `... analyze --repeats 1000` (CPU, about 45 seconds). Thresholds are calibrated on a clean half; every method is scored on a degraded quarter it never saw. Re-scoring the clean images reproduced the P2 cache to within 0.004 logits.
+
+**Violation rate** (sensitivity below 90%) and **detector firing** (KS, about 50 unlabelled degraded images):
+
+| Condition | Certified | Label-free | Few-label certified (≈25 TB labels) | Detector fires | Certified specificity |
+|---|---|---|---|---|---|
+| Clean (control) | 0.10 | 0.10 | 0.10 | 0.01 | 0.48 |
+| Blur, severity 3 | 0.02 | 0.09 | 0.11 | 0.41 | 0.19 |
+| Blur, severity 5 | 0.00 | **0.65** | 0.11 | 1.00 | **0.00** |
+| Noise, severity 3 | 0.00 | 0.18 | 0.12 | 1.00 | **0.01** |
+| JPEG, severity 5 | 0.03 | 0.29 | 0.14 | 0.95 | 0.09 |
+| Contrast, severity 4 | 0.09 | 0.15 | 0.12 | **0.11** | 0.41 |
+| Contrast, severity 5 | 0.06 | 0.20 | 0.11 | 0.59 | 0.22 |
+
+Full table (all 21 conditions, 7 methods, specificity): `results/p7_degradations/train_shenzhen__none.csv`.
+
+What it shows:
+
+1. **The certified sensitivity promise survived all 20 degradations** (violation ≤ 0.10). What broke was specificity: 0.48 → 0.00 under heavy blur or noise.
+2. **Why:** the certified threshold sits deep in the TB low tail (logit −4.87, the 5th percentile of clean TB scores). Degradations squeeze all scores toward the middle (TB spread 4.3 → 1.4 under heavy blur), so even the weakest TB cases rise above it, and so do the normal cases. The model becomes uncertain; a cautious threshold turns that into "flag everyone".
+3. **Label-free repair can break sensitivity even with the same TB prevalence** (65% violation under heavy blur): quantile matching assumes both classes move together, and blur moves them in opposite directions.
+4. **Few-label re-certification with about 25 TB labels kept violation at 0.10–0.14 in every condition** and kept specificity at 0.14–0.54 where the source threshold fell to 0.00.
+5. **Detection depends on the kind of damage:** blur and noise are detected almost always at high severity, but reduced contrast at severity 4 only 11% of the time, while specificity is already falling.
+6. Caveat: these are simulated, "compressive" degradations. A real acquisition change that lowers TB scores without making the model uncertain (the synthetic "harmful shift") would still break the promise.
 
 ## P5 and P6 on real data: can the shift be seen, and can it be repaired? (two sites)
 
@@ -218,6 +245,8 @@ You will be asked about this code in the viva. For each item: read the function,
 | P2 runner and report | `experiments/p2_models.py`, `p2_report.py` | Leave-one-site-out; frozen vs fine-tuned features; score caching | Why did fine-tuning help when trained on Shenzhen but hurt when trained on Montgomery? |
 | Leave-one-site-out study | `experiments/loso.py` | Repeated random calibration splits; in-distribution controls; violation rate vs mean sensitivity | Why does the control matter more than the headline number? Why can Montgomery never be the calibration source here? |
 | Real-data detection and repair | `experiments/real_shift.py` | Adaptation vs evaluation split; power and false-alarm rate; why each method may only see the adaptation half | Why must the few-label images be excluded from evaluation? Why did label-free repair break sensitivity here? |
+| Degradations | `degradations.py` | Gaussian noise, Gaussian blur, JPEG compression, contrast; what each mimics in a real hospital | Why define blur strength relative to image size? |
+| Degradation study | `experiments/p7_degradations.py` | Controlled experiments; score compression; why calibrate on clean and evaluate on degraded | Explain in one minute why heavy blur did not break the certified sensitivity promise but did destroy specificity. |
 | Synthetic shift experiment | `experiments/synthetic_shift.py` | Simulation design; controls; why exact sensitivity is known here | Explain each of the five scenarios and what it was built to reveal. |
 | Tests as specification | `tests/` | pytest basics; `parametrize`; `xfail`; fixtures | Pick one test in `test_conformal.py` and explain what bug it would catch. |
 
